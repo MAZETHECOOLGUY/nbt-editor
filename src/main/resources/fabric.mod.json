@@ -1,0 +1,42 @@
+{
+	"schemaVersion": 1,
+	"id": "nbt-editor",
+	"version": "${version}",
+	"name": "NBT Editor",
+	"description": "Edit the NBT / data components of any item in-game from a structured GUI: rename with formatting, set count, toggle unbreakable, enchantments, and attribute modifiers.",
+	"authors": [
+		"MAZETHECOOLGUY"
+	],
+	"contributors": [
+		"Claude (Anthropic)"
+	],
+	"contact": {
+		"homepage": "https://github.com/MAZETHECOOLGUY/nbt-editor",
+		"sources": "https://github.com/MAZETHECOOLGUY/nbt-editor",
+		"issues": "https://github.com/MAZETHECOOLGUY/nbt-editor/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/nbt-editor/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.example.NbtEditor"
+		],
+		"client": [
+			"com.example.client.NbtEditorClient"
+		]
+	},
+	"mixins": [
+		"nbt-editor.mixins.json",
+		{
+			"config": "nbt-editor.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
