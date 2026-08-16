@@ -1,0 +1,9 @@
+{
+	"key.nbt-editor.open_tabs": "Open Storage Tabs",
+	"container.nbt-editor.tabs": "Storage",
+	"gui.nbt-editor.tab_inventory": "Inventory",
+	"gui.nbt-editor.tab_storage": "Storage Tab %s",
+	"gui.nbt-editor.tab_new": "New Tab (%s/%s)",
+	"gui.nbt-editor.tab_new_full": "Tab limit reached (%s)",
+	"message.nbt-editor.tab_limit": "You already have the maximum of %s storage tabs."
+}
