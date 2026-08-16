@@ -1,6 +1,7 @@
 package com.example;
 
 import com.example.network.EditItemPayload;
+import com.example.tabs.TabsFeature;
 import com.example.util.ItemNbt;
 import com.mojang.serialization.DataResult;
 import net.fabricmc.api.ModInitializer;
@@ -36,6 +37,8 @@ public class NbtEditor implements ModInitializer {
 			// Networking callbacks run off the main thread; touch game state on the server thread.
 			context.server().execute(() -> applyEdit(player, payload));
 		});
+
+		TabsFeature.init();
 
 		LOGGER.info("nbt-editor initialized");
 	}

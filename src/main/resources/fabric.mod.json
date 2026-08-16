@@ -3,7 +3,7 @@
 	"id": "nbt-editor",
 	"version": "${version}",
 	"name": "NBT Editor",
-	"description": "Edit the NBT / data components of any item in-game from a structured GUI: rename with formatting, set count, toggle unbreakable, enchantments, and attribute modifiers.",
+	"description": "Edit the NBT / data components of any item in-game from a structured GUI: rename with formatting, set count, toggle unbreakable, enchantments, and attribute modifiers. Also adds up to 10 unlockable creative-style storage tabs of 54 slots each, with pickup overflow and death drops.",
 	"authors": [
 		"MAZETHECOOLGUY"
 	],
