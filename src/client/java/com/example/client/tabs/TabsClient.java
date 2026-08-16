@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.screens.MenuScreens;
@@ -55,6 +56,11 @@ public final class TabsClient {
 					TabStrip.render(graphics, client.font, geometry.nbteditor$leftPos(), geometry.nbteditor$topPos(),
 							geometry.nbteditor$imageWidth(), geometry.nbteditor$imageHeight(),
 							TabStrip.ENTRY_INVENTORY, mouseX, mouseY));
+
+			// Delete over a tab in the strip deletes that tab. Over a slot it falls through
+			// to AbstractContainerScreenMixin, which deletes the hovered item instead.
+			ScreenKeyboardEvents.allowKeyPress(screen).register((pressed, event) ->
+					event.key() != GLFW.GLFW_KEY_DELETE || !TabStrip.deleteHoveredTab(pressed));
 
 			ScreenMouseEvents.allowMouseClick(screen).register((clicked, event) -> {
 				int entry = TabStrip.entryAt(geometry.nbteditor$leftPos(), geometry.nbteditor$topPos(),

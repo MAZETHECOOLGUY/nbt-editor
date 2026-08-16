@@ -2,16 +2,20 @@ package com.example.client.tabs;
 
 import com.example.tabs.PlayerTabs;
 import com.example.tabs.network.CreateTabPayload;
+import com.example.tabs.network.DeleteTabPayload;
 import com.example.tabs.network.OpenTabsPayload;
 import com.example.tabs.network.SwitchTabPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
@@ -54,6 +58,9 @@ public final class TabStrip {
 
 	private static final int ENABLED_TEXT = 0xFFFFFFFF;
 	private static final int DISABLED_TEXT = 0xFF6E6E6E;
+
+	/** Last entry the cursor was over, refreshed every frame by {@link #render}. */
+	private static int hoveredEntry = ENTRY_NONE;
 
 	private TabStrip() {}
 
@@ -98,6 +105,8 @@ public final class TabStrip {
 		}
 
 		int hovered = entryAt(leftPos, topPos, imageWidth, imageHeight, mouseX, mouseY);
+		// Remembered for the Delete key, which has no cursor position of its own.
+		hoveredEntry = hovered;
 		if (hovered != ENTRY_NONE) {
 			graphics.setTooltipForNextFrame(font, tooltipFor(hovered), mouseX, mouseY);
 		}
@@ -155,6 +164,64 @@ public final class TabStrip {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Handle the Delete key over the tab strip: prompt, and only then ask the server to
+	 * delete the tab. Item deletion is handled per-slot elsewhere.
+	 *
+	 * @param returnTo the screen to restore once the prompt is answered.
+	 * @return true if the key was consumed.
+	 */
+	public static boolean deleteHoveredTab(Screen returnTo) {
+		int entry = hoveredEntry;
+		if (entry < 0) {
+			// Not over a storage tab (inventory tab, "+", or nothing at all).
+			return false;
+		}
+		Minecraft minecraft = Minecraft.getInstance();
+
+		if (ClientTabState.tabCount() <= 1) {
+			// The last tab always stays. Ask anyway rather than swallowing the key, so the
+			// server's refusal explains in chat why nothing happened.
+			ClientPlayNetworking.send(new DeleteTabPayload(entry));
+			return true;
+		}
+
+		playClick(minecraft);
+		minecraft.setScreen(new ConfirmDeleteTabScreen(entry, returnTo));
+		return true;
+	}
+
+	/**
+	 * The delete-tab prompt. It always hands the player back to the screen they came from -
+	 * including on Esc, which otherwise drops to the world while the server still believes
+	 * the container is open.
+	 */
+	private static final class ConfirmDeleteTabScreen extends ConfirmScreen {
+		private final Screen returnTo;
+
+		private ConfirmDeleteTabScreen(int tabIndex, Screen returnTo) {
+			super(
+					confirmed -> {
+						if (confirmed) {
+							ClientPlayNetworking.send(new DeleteTabPayload(tabIndex));
+						}
+						// Restoring the same screen is safe: nothing sent a container-close
+						// packet, so the menu is still open on both sides.
+						Minecraft.getInstance().setScreen(returnTo);
+					},
+					Component.translatable("gui.nbt-editor.delete_tab_title", tabIndex + 1),
+					Component.translatable("gui.nbt-editor.delete_tab_message"),
+					Component.translatable("gui.nbt-editor.delete_tab_confirm"),
+					CommonComponents.GUI_CANCEL);
+			this.returnTo = returnTo;
+		}
+
+		@Override
+		public void onClose() {
+			this.minecraft.setScreen(this.returnTo);
+		}
 	}
 
 	private static void renderTab(GuiGraphicsExtractor graphics, Font font, int leftPos, int topPos,

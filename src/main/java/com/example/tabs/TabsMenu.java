@@ -119,6 +119,19 @@ public class TabsMenu extends AbstractContainerMenu {
 		this.sendAllDataToRemote();
 	}
 
+	/**
+	 * Server side: the tab list changed underneath the menu, so re-point it and push
+	 * everything again. Unlike {@link #setActiveTab} this always re-syncs, because after
+	 * a deletion the same index can mean a different tab.
+	 */
+	public void refreshAfterTabRemoval(int index) {
+		if (this.clientMirror) {
+			return;
+		}
+		this.activeTab = Math.clamp(index, 0, this.tabs.tabCount() - 1);
+		this.sendAllDataToRemote();
+	}
+
 	/** Client side: adopt the tab count and highlight the server says we are looking at. */
 	public void applyClientState(int tabCount, int activeTab) {
 		if (!this.clientMirror) {

@@ -1,6 +1,8 @@
 package com.example.client.mixin;
 
 import com.example.client.ui.NbtEditorScreen;
+import com.example.network.DeleteItemPayload;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyEvent;
@@ -26,10 +28,9 @@ public abstract class AbstractContainerScreenMixin {
 
 	@Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
 	private void nbteditor$onKeyPressed(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
-		if (event.key() != GLFW.GLFW_KEY_SPACE) {
-			return;
-		}
-		if ((event.modifiers() & GLFW.GLFW_MOD_SHIFT) == 0) {
+		boolean edit = event.key() == GLFW.GLFW_KEY_SPACE && (event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0;
+		boolean delete = event.key() == GLFW.GLFW_KEY_DELETE;
+		if (!edit && !delete) {
 			return;
 		}
 		if (hoveredSlot == null) {
@@ -57,9 +58,15 @@ public abstract class AbstractContainerScreenMixin {
 		int syncId = playerInventory ? -1 : menu.containerId;
 		int slotIndex = playerInventory ? hoveredSlot.getContainerSlot() : hoveredSlot.index;
 
-		Minecraft.getInstance().setScreen(NbtEditorScreen.open(
-				playerInventory, syncId, slotIndex, stack, player.level().registryAccess()));
-		// Swallow the key so Space doesn't do anything else.
+		if (delete) {
+			// No prompt: this is a single item and the server echoes what it removed.
+			ClientPlayNetworking.send(new DeleteItemPayload(playerInventory, syncId, slotIndex));
+		} else {
+			Minecraft.getInstance().setScreen(NbtEditorScreen.open(
+					playerInventory, syncId, slotIndex, stack, player.level().registryAccess()));
+		}
+
+		// Swallow the key so it doesn't do anything else.
 		cir.setReturnValue(true);
 	}
 }

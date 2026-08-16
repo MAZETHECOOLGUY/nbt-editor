@@ -1,9 +1,11 @@
 package com.example.tabs;
 
 import com.example.tabs.network.CreateTabPayload;
+import com.example.tabs.network.DeleteTabPayload;
 import com.example.tabs.network.OpenTabsPayload;
 import com.example.tabs.network.SwitchTabPayload;
 import com.example.tabs.network.TabSyncPayload;
+import java.util.List;
 import java.util.Objects;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -13,6 +15,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.gamerules.GameRules;
 
 /**
@@ -29,6 +32,7 @@ public final class TabsFeature {
 		PayloadTypeRegistry.serverboundPlay().register(OpenTabsPayload.TYPE, OpenTabsPayload.STREAM_CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(SwitchTabPayload.TYPE, SwitchTabPayload.STREAM_CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(CreateTabPayload.TYPE, CreateTabPayload.STREAM_CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(DeleteTabPayload.TYPE, DeleteTabPayload.STREAM_CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(TabSyncPayload.TYPE, TabSyncPayload.STREAM_CODEC);
 
 		// Touch both classes so the attachment and the menu type are registered during init
@@ -49,6 +53,11 @@ public final class TabsFeature {
 		ServerPlayNetworking.registerGlobalReceiver(CreateTabPayload.TYPE, (payload, context) -> {
 			ServerPlayer player = context.player();
 			context.server().execute(() -> createTab(player));
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(DeleteTabPayload.TYPE, (payload, context) -> {
+			ServerPlayer player = context.player();
+			context.server().execute(() -> deleteTab(player, payload.tabIndex()));
 		});
 
 		// The strip is drawn on the vanilla inventory screen, so hand out the count on join.
@@ -98,6 +107,40 @@ public final class TabsFeature {
 		} else {
 			// "+" was pressed from the vanilla inventory screen: open straight into the new tab.
 			player.openMenu(TabsMenu.provider(tabs, created));
+		}
+		sync(player, activeTabOf(player));
+	}
+
+	private static void deleteTab(ServerPlayer player, int tabIndex) {
+		PlayerTabs tabs = TabStorage.get(player);
+		if (!tabs.isValidIndex(tabIndex)) {
+			return;
+		}
+
+		if (!tabs.canRemoveTab()) {
+			player.sendSystemMessage(Component.translatable("message.nbt-editor.tab_last")
+					.withStyle(ChatFormatting.RED));
+			sync(player, activeTabOf(player));
+			return;
+		}
+
+		int activeBefore = activeTabOf(player);
+		List<ItemStack> destroyed = tabs.removeTab(tabIndex);
+		if (destroyed == null) {
+			return;
+		}
+
+		if (!destroyed.isEmpty()) {
+			player.sendSystemMessage(Component.translatable("message.nbt-editor.tab_deleted_overflow",
+					tabIndex + 1, destroyed.size()).withStyle(ChatFormatting.RED));
+		} else {
+			player.sendSystemMessage(Component.translatable("message.nbt-editor.tab_deleted", tabIndex + 1)
+					.withStyle(ChatFormatting.YELLOW));
+		}
+
+		if (player.containerMenu instanceof TabsMenu menu) {
+			// Tabs after the deleted one shifted down, so follow the one we were looking at.
+			menu.refreshAfterTabRemoval(activeBefore > tabIndex ? activeBefore - 1 : activeBefore);
 		}
 		sync(player, activeTabOf(player));
 	}
