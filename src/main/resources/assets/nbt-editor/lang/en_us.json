@@ -5,5 +5,11 @@
 	"gui.nbt-editor.tab_storage": "Storage Tab %s",
 	"gui.nbt-editor.tab_new": "New Tab (%s/%s)",
 	"gui.nbt-editor.tab_new_full": "Tab limit reached (%s)",
-	"message.nbt-editor.tab_limit": "You already have the maximum of %s storage tabs."
+	"gui.nbt-editor.delete_tab_title": "Delete Storage Tab %s?",
+	"gui.nbt-editor.delete_tab_message": "Its items move into your remaining tabs. Anything that does not fit is destroyed. This cannot be undone.",
+	"gui.nbt-editor.delete_tab_confirm": "Delete Tab",
+	"message.nbt-editor.tab_limit": "You already have the maximum of %s storage tabs.",
+	"message.nbt-editor.tab_last": "You cannot delete your last storage tab.",
+	"message.nbt-editor.tab_deleted": "Deleted storage tab %s.",
+	"message.nbt-editor.tab_deleted_overflow": "Deleted storage tab %s. %s stack(s) did not fit in your remaining tabs and were destroyed."
 }

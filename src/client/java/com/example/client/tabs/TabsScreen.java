@@ -3,11 +3,13 @@ package com.example.client.tabs;
 import com.example.tabs.TabsMenu;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
+import org.lwjgl.glfw.GLFW;
 
 /** The storage screen: a double chest worth of slots, with the tab strip around it. */
 public class TabsScreen extends AbstractContainerScreen<TabsMenu> {
@@ -51,6 +53,16 @@ public class TabsScreen extends AbstractContainerScreen<TabsMenu> {
 			return TabStrip.click(entry, this.menu.getActiveTab());
 		}
 		return super.mouseClicked(event, doubleClick);
+	}
+
+	@Override
+	public boolean keyPressed(KeyEvent event) {
+		// Delete over a tab removes that tab; over a slot it falls through to the shared
+		// container-screen handler, which deletes the hovered item instead.
+		if (event.key() == GLFW.GLFW_KEY_DELETE && TabStrip.deleteHoveredTab(this)) {
+			return true;
+		}
+		return super.keyPressed(event);
 	}
 
 	@Override

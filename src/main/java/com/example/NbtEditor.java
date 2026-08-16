@@ -1,5 +1,6 @@
 package com.example;
 
+import com.example.network.DeleteItemPayload;
 import com.example.network.EditItemPayload;
 import com.example.tabs.TabsFeature;
 import com.example.util.ItemNbt;
@@ -29,13 +30,19 @@ public class NbtEditor implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		// Register the payload type on both sides so client and server agree on the wire format.
+		// Register the payload types on both sides so client and server agree on the wire format.
 		PayloadTypeRegistry.serverboundPlay().register(EditItemPayload.TYPE, EditItemPayload.STREAM_CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(DeleteItemPayload.TYPE, DeleteItemPayload.STREAM_CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(EditItemPayload.TYPE, (payload, context) -> {
 			ServerPlayer player = context.player();
 			// Networking callbacks run off the main thread; touch game state on the server thread.
 			context.server().execute(() -> applyEdit(player, payload));
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(DeleteItemPayload.TYPE, (payload, context) -> {
+			ServerPlayer player = context.player();
+			context.server().execute(() -> deleteItem(player, payload));
 		});
 
 		TabsFeature.init();
@@ -44,9 +51,7 @@ public class NbtEditor implements ModInitializer {
 	}
 
 	private static void applyEdit(ServerPlayer player, EditItemPayload payload) {
-		Permission required = new Permission.HasCommandLevel(PermissionLevel.byId(REQUIRED_PERMISSION_LEVEL));
-		if (!player.permissions().hasPermission(required)) {
-			reject(player, "You don't have permission to edit items (needs op).");
+		if (!canEdit(player)) {
 			return;
 		}
 
@@ -85,6 +90,60 @@ public class NbtEditor implements ModInitializer {
 		}
 
 		player.sendSystemMessage(Component.literal("[nbt-editor] Item updated.").withStyle(ChatFormatting.GREEN));
+	}
+
+	/** Clear the targeted slot. Same targeting and permission gate as an edit. */
+	private static void deleteItem(ServerPlayer player, DeleteItemPayload payload) {
+		if (!canEdit(player)) {
+			return;
+		}
+
+		ItemStack deleted;
+
+		if (payload.playerInventory()) {
+			Inventory inventory = player.getInventory();
+			int slot = payload.slotIndex();
+			if (slot < 0 || slot >= inventory.getContainerSize()) {
+				reject(player, "Invalid inventory slot " + slot + ".");
+				return;
+			}
+			deleted = inventory.getItem(slot).copy();
+			inventory.setItem(slot, ItemStack.EMPTY);
+			player.inventoryMenu.broadcastChanges();
+		} else {
+			AbstractContainerMenu menu = player.containerMenu;
+			if (menu == null || menu.containerId != payload.syncId()) {
+				reject(player, "That container is no longer open.");
+				return;
+			}
+			if (!menu.isValidSlotIndex(payload.slotIndex())) {
+				reject(player, "Invalid slot.");
+				return;
+			}
+			Slot slot = menu.getSlot(payload.slotIndex());
+			deleted = slot.getItem().copy();
+			slot.set(ItemStack.EMPTY);
+			menu.broadcastChanges();
+		}
+
+		if (deleted.isEmpty()) {
+			return;
+		}
+
+		player.sendSystemMessage(Component.literal("[nbt-editor] Deleted ")
+				.append(Component.literal(deleted.getCount() + "x ").append(deleted.getHoverName()))
+				.append(Component.literal("."))
+				.withStyle(ChatFormatting.YELLOW));
+	}
+
+	/** True if the player may edit or delete items; tells them why not otherwise. */
+	private static boolean canEdit(ServerPlayer player) {
+		Permission required = new Permission.HasCommandLevel(PermissionLevel.byId(REQUIRED_PERMISSION_LEVEL));
+		if (player.permissions().hasPermission(required)) {
+			return true;
+		}
+		reject(player, "You don't have permission to edit items (needs op).");
+		return false;
 	}
 
 	private static void reject(ServerPlayer player, String message) {

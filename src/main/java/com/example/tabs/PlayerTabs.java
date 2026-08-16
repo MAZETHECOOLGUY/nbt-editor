@@ -88,6 +88,34 @@ public final class PlayerTabs {
 		return this.tabs.size() - 1;
 	}
 
+	/** Everyone keeps at least one tab, so the last one cannot be deleted. */
+	public boolean canRemoveTab() {
+		return this.tabs.size() > 1;
+	}
+
+	/**
+	 * Delete a tab, cascading whatever was in it into the tabs that remain. Tabs after
+	 * the deleted one shift down by one.
+	 *
+	 * @return the stacks that had nowhere left to go and were destroyed, or {@code null}
+	 *         if this tab cannot be deleted.
+	 */
+	public List<ItemStack> removeTab(int index) {
+		if (!this.isValidIndex(index) || !this.canRemoveTab()) {
+			return null;
+		}
+
+		List<ItemStack> contents = this.tabs.remove(index).removeAllItems();
+		List<ItemStack> destroyed = new ArrayList<>();
+		for (ItemStack stack : contents) {
+			this.insert(stack);
+			if (!stack.isEmpty()) {
+				destroyed.add(stack);
+			}
+		}
+		return destroyed;
+	}
+
 	/**
 	 * Insert a stack, filling tab 0 first and cascading forward.
 	 * The passed stack is shrunk in place by however much was absorbed.
