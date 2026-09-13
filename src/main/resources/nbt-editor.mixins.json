@@ -3,7 +3,7 @@
 	"package": "com.example.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"ItemEntityMixin"
+		"InventoryMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
