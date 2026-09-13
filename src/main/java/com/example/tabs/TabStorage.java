@@ -34,7 +34,7 @@ public final class TabStorage {
 	 * Cascade a stack that did not fit in the vanilla inventory across tabs 0..N.
 	 * Shrinks {@code stack} in place.
 	 *
-	 * @return true if anything was absorbed (so the pickup counts as successful).
+	 * @return true if anything was absorbed (so the insert counts as successful).
 	 */
 	public static boolean insert(ServerPlayer player, ItemStack stack) {
 		return get(player).insert(stack);
