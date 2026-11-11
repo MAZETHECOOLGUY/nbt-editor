@@ -1,0 +1,183 @@
+<owo-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <components>
+        <flow-layout direction="vertical">
+            <children>
+                <!-- HEADER BAR -->
+                <flow-layout direction="horizontal" id="header">
+                    <children>
+                        <flow-layout direction="horizontal" id="header-item-box">
+                            <children>
+                                <item id="header-item-icon">
+                                    <show-overlay>true</show-overlay>
+                                    <set-tooltip-from-stack>true</set-tooltip-from-stack>
+                                    <sizing>
+                                        <horizontal method="fixed">20</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                </item>
+                                <flow-layout direction="vertical">
+                                    <children>
+                                        <label id="header-title">
+                                            <text>NBT Editor</text>
+                                            <shadow>true</shadow>
+                                        </label>
+                                        <label id="header-item-id">
+                                            <text>minecraft:item</text>
+                                            <color>#FFA040</color>
+                                        </label>
+                                    </children>
+                                    <margins>
+                                        <left>8</left>
+                                    </margins>
+                                    <vertical-alignment>center</vertical-alignment>
+                                </flow-layout>
+                            </children>
+                            <vertical-alignment>center</vertical-alignment>
+                        </flow-layout>
+
+                        <spacer/>
+
+                        <!-- TAB NAVIGATION BUTTONS -->
+                        <flow-layout direction="horizontal" id="tab-buttons">
+                            <children>
+                                <button id="tab-btn-overview">
+                                    <text>Overview</text>
+                                    <sizing>
+                                        <horizontal method="fixed">80</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                    <renderer>
+                                        <flat color="#1A1A20" hovered-color="#2D2D38" disabled-color="#FF7A00"/>
+                                    </renderer>
+                                </button>
+                                <button id="tab-btn-enchants">
+                                    <text>Enchants</text>
+                                    <sizing>
+                                        <horizontal method="fixed">80</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                    <renderer>
+                                        <flat color="#1A1A20" hovered-color="#2D2D38" disabled-color="#FF7A00"/>
+                                    </renderer>
+                                </button>
+                                <button id="tab-btn-attributes">
+                                    <text>Attributes</text>
+                                    <sizing>
+                                        <horizontal method="fixed">80</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                    <renderer>
+                                        <flat color="#1A1A20" hovered-color="#2D2D38" disabled-color="#FF7A00"/>
+                                    </renderer>
+                                </button>
+                                <button id="tab-btn-tree">
+                                    <text>NBT Tree</text>
+                                    <sizing>
+                                        <horizontal method="fixed">80</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                    <renderer>
+                                        <flat color="#1A1A20" hovered-color="#2D2D38" disabled-color="#FF7A00"/>
+                                    </renderer>
+                                </button>
+                            </children>
+                            <gap>4</gap>
+                            <vertical-alignment>center</vertical-alignment>
+                        </flow-layout>
+                    </children>
+
+                    <sizing>
+                        <horizontal method="fill">100</horizontal>
+                        <vertical method="fixed">32</vertical>
+                    </sizing>
+                    <padding>
+                        <horizontal>10</horizontal>
+                        <vertical>4</vertical>
+                    </padding>
+                    <vertical-alignment>center</vertical-alignment>
+                    <surface>
+                        <flat>#F0101014</flat>
+                        <outline>#40FF7A00</outline>
+                    </surface>
+                </flow-layout>
+
+                <!-- MAIN WORKSPACE -->
+                <flow-layout direction="horizontal" id="main-content">
+                    <children/>
+                    <sizing>
+                        <horizontal method="fill">100</horizontal>
+                        <vertical method="expand">100</vertical>
+                    </sizing>
+                    <padding>
+                        <all>2</all>
+                    </padding>
+                </flow-layout>
+
+                <!-- FOOTER BAR -->
+                <flow-layout direction="horizontal" id="footer">
+                    <children>
+                        <label id="status-label">
+                            <text>Ready.</text>
+                            <color>#FFA040</color>
+                        </label>
+
+                        <spacer/>
+
+                        <flow-layout direction="horizontal" id="footer-actions">
+                            <children>
+                                <button id="cancel-button">
+                                    <text>Cancel</text>
+                                    <sizing>
+                                        <horizontal method="fixed">70</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                    <renderer>
+                                        <flat color="#1E1E24" hovered-color="#2E2E38" disabled-color="#141418"/>
+                                    </renderer>
+                                </button>
+                                <button id="save-button">
+                                    <text>Save Changes</text>
+                                    <sizing>
+                                        <horizontal method="fixed">100</horizontal>
+                                        <vertical method="fixed">20</vertical>
+                                    </sizing>
+                                    <renderer>
+                                        <flat color="#E65100" hovered-color="#FF7A00" disabled-color="#3A1C08"/>
+                                    </renderer>
+                                </button>
+                            </children>
+                            <gap>6</gap>
+                            <vertical-alignment>center</vertical-alignment>
+                        </flow-layout>
+                    </children>
+
+                    <sizing>
+                        <horizontal method="fill">100</horizontal>
+                        <vertical method="fixed">28</vertical>
+                    </sizing>
+                    <padding>
+                        <horizontal>10</horizontal>
+                        <vertical>4</vertical>
+                    </padding>
+                    <vertical-alignment>center</vertical-alignment>
+                    <surface>
+                        <flat>#F0101014</flat>
+                        <outline>#40FF7A00</outline>
+                    </surface>
+                </flow-layout>
+            </children>
+
+            <sizing>
+                <horizontal method="fill">100</horizontal>
+                <vertical method="fill">100</vertical>
+            </sizing>
+            <padding>
+                <all>6</all>
+            </padding>
+            <gap>4</gap>
+            <surface>
+                <flat>#E608080A</flat>
+            </surface>
+        </flow-layout>
+    </components>
+</owo-ui>

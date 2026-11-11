@@ -3,19 +3,28 @@ package com.example.client.ui;
 import com.example.NbtEditor;
 import com.example.network.EditItemPayload;
 import com.example.util.ItemNbt;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import com.mojang.serialization.DataResult;
+import io.wispforest.owo.ui.base.BaseUIModelScreen;
+import io.wispforest.owo.ui.component.BoxComponent;
+import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.CheckboxComponent;
+import io.wispforest.owo.ui.component.ItemComponent;
+import io.wispforest.owo.ui.component.LabelComponent;
+import io.wispforest.owo.ui.component.SpacerComponent;
+import io.wispforest.owo.ui.component.TextBoxComponent;
+import io.wispforest.owo.ui.component.UIComponents;
+import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.ScrollContainer;
+import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.Color;
+import io.wispforest.owo.ui.core.CursorStyle;
+import io.wispforest.owo.ui.core.HorizontalAlignment;
+import io.wispforest.owo.ui.core.Insets;
+import io.wispforest.owo.ui.core.Sizing;
+import io.wispforest.owo.ui.core.Surface;
+import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.ByteTag;
@@ -29,101 +38,120 @@ import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.ShortTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
 /**
- * Structured NBT tree editor for a whole item ({@code {id, count, components}}).
- * Single-click selects a node; double-click expands/collapses a container.
- * Edits are applied live as you type — there is no Apply button; the right-hand
- * vertical toolbar drives presets and tree tools, and Save sends the tree to the
- * server, which decodes it authoritatively.
+ * Polished, tabbed NBT & Data Components editor built with oωo-lib UI.
+ * Features a Black and Orange theme, live 3D item preview, searchable enchantments
+ * and attributes pickers, and a structured raw NBT hierarchy tree.
  */
-public class NbtEditorScreen extends Screen {
-	// NBT type ids.
+public class NbtEditorScreen extends BaseUIModelScreen<FlowLayout> {
+
 	private static final int T_BYTE = 1, T_SHORT = 2, T_INT = 3, T_LONG = 4,
 			T_FLOAT = 5, T_DOUBLE = 6, T_STRING = 8, T_LIST = 9, T_COMPOUND = 10;
 	private static final int[] TYPE_CYCLE = {T_BYTE, T_SHORT, T_INT, T_LONG, T_FLOAT, T_DOUBLE, T_STRING, T_LIST, T_COMPOUND};
 
-	private static final int ROW_HEIGHT = 12;
-	private static final int INDENT = 12;
-	private static final int LIST_TOP = 38;
-	private static final int MARGIN = 20;
-	private static final int SIDEBAR_W = 100;
-	private static final int BTN_H = 16;
-
-	// Rename toolbar geometry (format toggles + colour swatches).
-	private static final int FMT_SIZE = 18, FMT_GAP = 4;
-	private static final int SWATCH = 16, SWATCH_GAP = 4;
-	private static final String[] FMT_LETTERS = {"B", "I", "U", "S", "K"};
 	private static final ChatFormatting[] NAME_COLORS = {
 			ChatFormatting.BLACK, ChatFormatting.DARK_BLUE, ChatFormatting.DARK_GREEN, ChatFormatting.DARK_AQUA,
 			ChatFormatting.DARK_RED, ChatFormatting.DARK_PURPLE, ChatFormatting.GOLD, ChatFormatting.GRAY,
 			ChatFormatting.DARK_GRAY, ChatFormatting.BLUE, ChatFormatting.GREEN, ChatFormatting.AQUA,
-			ChatFormatting.RED, ChatFormatting.LIGHT_PURPLE, ChatFormatting.YELLOW, ChatFormatting.WHITE};
+			ChatFormatting.RED, ChatFormatting.LIGHT_PURPLE, ChatFormatting.YELLOW, ChatFormatting.WHITE
+	};
 
-	/** Quick-edit preset that repurposes the bottom panel (and, for Enchant/Attributes, the main area). */
-	private enum Preset { NONE, RENAME, COUNT, ENCHANT, ATTRIBUTES }
+	// ---- Black & Orange Theme Palette ----
+	private static final int COLOR_PANEL_BG = 0xFF121216;
+	private static final int COLOR_CARD_BG = 0xFF18181E;
+	private static final int COLOR_INSET_BG = 0xFF0E0E12;
+	private static final int COLOR_BORDER_SUBTLE = 0xFF2A2A34;
+	private static final int COLOR_BORDER_ACTIVE = 0xFFFF7A00;
+	private static final int COLOR_ORANGE_PRIMARY = 0xFFFF7A00;
+	private static final int COLOR_ORANGE_HOVER = 0xFFFFA040;
+	private static final int COLOR_ORANGE_DARK = 0xFFE65100;
+	private static final int COLOR_TEXT_MUTED = 0xFFAAAAAA;
+
+	private static final Surface CARD_SURFACE = Surface.flat(COLOR_CARD_BG).and(Surface.outline(COLOR_BORDER_SUBTLE));
+	private static final Surface ACTIVE_CARD_SURFACE = Surface.flat(0xFF221A14).and(Surface.outline(COLOR_BORDER_ACTIVE));
+	private static final Surface PANEL_SURFACE = Surface.flat(COLOR_PANEL_BG).and(Surface.outline(COLOR_BORDER_SUBTLE));
+	private static final Surface INSET_SURFACE = Surface.flat(COLOR_INSET_BG).and(Surface.outline(COLOR_BORDER_SUBTLE));
+
+	private static final ButtonComponent.Renderer BTN_STANDARD = ButtonComponent.Renderer.flat(0xFF202028, 0xFF30303C, 0xFF141418);
+	private static final ButtonComponent.Renderer BTN_ORANGE = ButtonComponent.Renderer.flat(COLOR_ORANGE_DARK, COLOR_ORANGE_PRIMARY, 0xFF3D2010);
+	private static final ButtonComponent.Renderer BTN_ACTIVE_TAB = ButtonComponent.Renderer.flat(COLOR_ORANGE_PRIMARY, COLOR_ORANGE_HOVER, COLOR_ORANGE_DARK);
+	private static final ButtonComponent.Renderer BTN_INACTIVE_TAB = ButtonComponent.Renderer.flat(0xFF181820, 0xFF282834, 0xFF121216);
+
+	public enum Tab { OVERVIEW, ENCHANTS, ATTRIBUTES, TREE }
 
 	private final boolean playerInventory;
 	private final int syncId;
 	private final int slotIndex;
 	private final CompoundTag root;
 	private final RegistryAccess registries;
+	private ItemStack currentStack;
 
-	private final Set<Tag> expanded = Collections.newSetFromMap(new IdentityHashMap<>());
-	private final List<Row> rows = new ArrayList<>();
-	private int scroll;
+	// Top & bottom widgets bound from nbt_editor.xml
+	private ItemComponent headerItemIcon;
+	private LabelComponent headerItemId;
+	private ButtonComponent tabBtnOverview;
+	private ButtonComponent tabBtnEnchants;
+	private ButtonComponent tabBtnAttributes;
+	private ButtonComponent tabBtnTree;
+	private FlowLayout mainContent;
+	private LabelComponent statusLabel;
+	private ButtonComponent saveButton;
+	private ButtonComponent cancelButton;
 
-	// Selection is identified by (parent, key | index) so it survives tag replacement.
-	private Tag selParent;
-	private String selKey;   // non-null when parent is a CompoundTag
-	private int selIndex = -1; // used when parent is a ListTag
+	// Live preview in Overview tab
+	private ItemComponent overviewItemPreview;
+	private LabelComponent overviewNamePreview;
+	private LabelComponent overviewCountBadge;
+	private LabelComponent overviewDurabilityBadge;
+	private LabelComponent overviewEnchantsBadge;
+	private LabelComponent overviewAttributesBadge;
 
-	private Preset preset = Preset.NONE;
-	private String presetStatus = "";
-
-	// Rename toolbar state.
+	// Custom name formatting state
 	private boolean fmtBold, fmtItalic, fmtUnderline, fmtStrike, fmtObfuscated;
-	private ChatFormatting nameColor; // null = default (no explicit colour)
+	private ChatFormatting nameColor = null;
 
-	// Enchant picker state.
+	// Enchantments state
 	private List<Identifier> allEnchants = List.of();
-	private String enchSelectedId; // full id string of the enchant being edited, or null
+	private String enchantSearchQuery = "";
+	private boolean enchantOnlyActive = false;
 
-	// Attribute picker state.
+	// Attributes state
 	private List<Identifier> allAttributes = List.of();
-	private String attrSelectedId; // full id string of the attribute being edited, or null
-	private int attrOpIndex;   // index into Presets.OPERATIONS
-	private int attrSlotIndex; // index into Presets.SLOT_GROUPS
+	private String attributeSearchQuery = "";
+	private boolean attributeOnlyActive = false;
 
-	private EditBox keyBox;
-	private EditBox valueBox;
-	private boolean suppressResponder;
-
-	private Button renameBtn;
-	private Button countBtn;
-	private Button unbreakBtn;
-	private Button enchantBtn;
-	private Button attributesBtn;
-	private Button addBtn;
-	private Button deleteBtn;
-	private Button typeBtn;
+	// Raw NBT Tree state
+	private final Set<Tag> expandedTags = Collections.newSetFromMap(new IdentityHashMap<>());
+	private Tag selectedTagParent = null;
+	private String selectedTagKey = null;
+	private int selectedTagIndex = -1;
+	private FlowLayout treeInspectorContainer;
 
 	private NbtEditorScreen(boolean playerInventory, int syncId, int slotIndex, CompoundTag root,
-			RegistryAccess registries) {
-		super(Component.literal("NBT Editor"));
+			RegistryAccess registries, ItemStack stack) {
+		super(FlowLayout.class, DataSource.asset(Identifier.fromNamespaceAndPath("nbt-editor", "nbt_editor")));
 		this.playerInventory = playerInventory;
 		this.syncId = syncId;
 		this.slotIndex = slotIndex;
 		this.root = root;
 		this.registries = registries;
-		this.expanded.add(root);
+		this.currentStack = stack.copy();
+		this.expandedTags.add(root);
 	}
 
 	public static NbtEditorScreen open(boolean playerInventory, int syncId, int slotIndex, ItemStack stack,
@@ -133,298 +161,946 @@ public class NbtEditorScreen extends Screen {
 			NbtEditor.LOGGER.warn("Failed to encode item to NBT; opening empty editor");
 			tag = new CompoundTag();
 		}
-		return new NbtEditorScreen(playerInventory, syncId, slotIndex, tag, registries);
+		return new NbtEditorScreen(playerInventory, syncId, slotIndex, tag, registries, stack);
 	}
 
-	// ---- layout helpers ----
-	private int sidebarX() { return this.width - MARGIN - SIDEBAR_W; }
-	private int centralRight() { return sidebarX() - 8; }
-	private int treeBottom() { return this.height - 46; }
-	private int breadcrumbY() { return this.height - 40; }
-	private int boxesY() { return this.height - 26; }
-
 	@Override
-	protected void init() {
+	protected void build(FlowLayout rootComponent) {
+		headerItemIcon = rootComponent.childById(ItemComponent.class, "header-item-icon");
+		headerItemId = rootComponent.childById(LabelComponent.class, "header-item-id");
+		tabBtnOverview = rootComponent.childById(ButtonComponent.class, "tab-btn-overview");
+		tabBtnEnchants = rootComponent.childById(ButtonComponent.class, "tab-btn-enchants");
+		tabBtnAttributes = rootComponent.childById(ButtonComponent.class, "tab-btn-attributes");
+		tabBtnTree = rootComponent.childById(ButtonComponent.class, "tab-btn-tree");
+		mainContent = rootComponent.childById(FlowLayout.class, "main-content");
+		statusLabel = rootComponent.childById(LabelComponent.class, "status-label");
+		saveButton = rootComponent.childById(ButtonComponent.class, "save-button");
+		cancelButton = rootComponent.childById(ButtonComponent.class, "cancel-button");
+
 		allEnchants = Presets.allEnchantmentIds(registries);
 		allAttributes = Presets.allAttributeIds(registries);
 
-		// Right-hand vertical toolbar: presets, then tree tools, then Save/Cancel.
-		int bx = sidebarX();
-		int by = LIST_TOP;
-		renameBtn = addRenderableWidget(tab("Rename", () -> beginPreset(Preset.RENAME), bx, by));
-		by += BTN_H + 3;
-		countBtn = addRenderableWidget(tab("Count", () -> beginPreset(Preset.COUNT), bx, by));
-		by += BTN_H + 3;
-		unbreakBtn = addRenderableWidget(tab("Unbreakable", this::toggleUnbreakable, bx, by));
-		by += BTN_H + 3;
-		enchantBtn = addRenderableWidget(tab("Enchant", () -> beginPreset(Preset.ENCHANT), bx, by));
-		by += BTN_H + 3;
-		attributesBtn = addRenderableWidget(tab("Attributes", () -> beginPreset(Preset.ATTRIBUTES), bx, by));
-		by += BTN_H + 10;
-		addBtn = addRenderableWidget(tab("Add", this::addChild, bx, by));
-		by += BTN_H + 3;
-		deleteBtn = addRenderableWidget(tab("Delete", this::deleteSelected, bx, by));
-		by += BTN_H + 3;
-		typeBtn = addRenderableWidget(tab("Type >", this::cycleType, bx, by));
-		by += BTN_H + 10;
-		addRenderableWidget(tab("Save", this::save, bx, by));
-		by += BTN_H + 3;
-		addRenderableWidget(tab("Cancel", this::onClose, bx, by));
+		Style style = Presets.currentNameStyle(root, registries);
+		fmtBold = style.isBold();
+		fmtItalic = style.isItalic();
+		fmtUnderline = style.isUnderlined();
+		fmtStrike = style.isStrikethrough();
+		fmtObfuscated = style.isObfuscated();
+		nameColor = matchColor(style.getColor());
 
-		keyBox = new CommitEditBox(MARGIN, boxesY(), 150, 16);
-		keyBox.setMaxLength(Short.MAX_VALUE);
-		keyBox.setHint(Component.literal("key"));
-		addRenderableWidget(keyBox);
+		tabBtnOverview.onPress(b -> switchTab(Tab.OVERVIEW));
+		tabBtnEnchants.onPress(b -> switchTab(Tab.ENCHANTS));
+		tabBtnAttributes.onPress(b -> switchTab(Tab.ATTRIBUTES));
+		tabBtnTree.onPress(b -> switchTab(Tab.TREE));
 
-		valueBox = new EditBox(this.font, MARGIN + 158, boxesY(), centralRight() - (MARGIN + 158), 16,
-				Component.literal("value"));
-		valueBox.setMaxLength(Short.MAX_VALUE);
-		valueBox.setHint(Component.literal("value"));
-		valueBox.setResponder(this::onValueChanged);
-		addRenderableWidget(valueBox);
+		cancelButton.onPress(b -> onClose());
+		saveButton.onPress(b -> save());
 
-		syncPanel();
+		updatePreview();
+		switchTab(Tab.OVERVIEW);
+		setStatus("Edits apply live — press Save Changes to keep.", false);
 	}
 
-	private Button tab(String label, Runnable action, int x, int y) {
-		return Button.builder(Component.literal(label), b -> action.run()).bounds(x, y, SIDEBAR_W, BTN_H).build();
-	}
+	private void switchTab(Tab tab) {
+		tabBtnOverview.renderer(tab == Tab.OVERVIEW ? BTN_ACTIVE_TAB : BTN_INACTIVE_TAB);
+		tabBtnEnchants.renderer(tab == Tab.ENCHANTS ? BTN_ACTIVE_TAB : BTN_INACTIVE_TAB);
+		tabBtnAttributes.renderer(tab == Tab.ATTRIBUTES ? BTN_ACTIVE_TAB : BTN_INACTIVE_TAB);
+		tabBtnTree.renderer(tab == Tab.TREE ? BTN_ACTIVE_TAB : BTN_INACTIVE_TAB);
 
-	// ---- selection ----
-	private boolean hasSelection() {
-		return selParent != null && selectedTag() != null;
-	}
-
-	private Tag selectedTag() {
-		if (selParent instanceof CompoundTag c && selKey != null) {
-			return c.get(selKey);
+		mainContent.clearChildren();
+		switch (tab) {
+			case OVERVIEW -> mainContent.child(buildOverviewTab());
+			case ENCHANTS -> mainContent.child(buildEnchantsTab());
+			case ATTRIBUTES -> mainContent.child(buildAttributesTab());
+			case TREE -> mainContent.child(buildTreeTab());
 		}
-		if (selParent instanceof ListTag l && selIndex >= 0 && selIndex < l.size()) {
-			return l.get(selIndex);
+	}
+
+	// ==========================================
+	// TAB 1: OVERVIEW & QUICK EDIT
+	// ==========================================
+	private FlowLayout buildOverviewTab() {
+		FlowLayout container = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(100));
+		container.gap(8);
+
+		// Left Card: 3D Item Showcase
+		FlowLayout previewCard = UIContainers.verticalFlow(Sizing.fixed(160), Sizing.fill(100));
+		previewCard.surface(CARD_SURFACE);
+		previewCard.padding(Insets.of(12));
+		previewCard.gap(6);
+		previewCard.horizontalAlignment(HorizontalAlignment.CENTER);
+		previewCard.verticalAlignment(VerticalAlignment.CENTER);
+
+		LabelComponent previewHeader = UIComponents.label(Component.literal("Live Preview"));
+		previewHeader.color(Color.ofRgb(COLOR_ORANGE_PRIMARY)).shadow(true);
+		previewCard.child(previewHeader);
+
+		overviewItemPreview = UIComponents.item(currentStack);
+		overviewItemPreview.sizing(Sizing.fixed(48), Sizing.fixed(48));
+		overviewItemPreview.showOverlay(true);
+		overviewItemPreview.setTooltipFromStack(true);
+		previewCard.child(overviewItemPreview);
+
+		overviewNamePreview = UIComponents.label(currentStack.getHoverName());
+		overviewNamePreview.shadow(true);
+		previewCard.child(overviewNamePreview);
+
+		overviewCountBadge = UIComponents.label(Component.literal("Count: " + Presets.currentCount(root)));
+		overviewCountBadge.color(Color.ofRgb(COLOR_TEXT_MUTED));
+		previewCard.child(overviewCountBadge);
+
+		overviewDurabilityBadge = UIComponents.label(Component.literal(
+				Presets.hasComponent(root, DataComponents.UNBREAKABLE) ? "✦ Unbreakable" : "Durability: Standard"));
+		overviewDurabilityBadge.color(Color.ofRgb(Presets.hasComponent(root, DataComponents.UNBREAKABLE) ? COLOR_ORANGE_HOVER : COLOR_TEXT_MUTED));
+		previewCard.child(overviewDurabilityBadge);
+
+		int enchCount = Presets.currentEnchantments(root, registries).size();
+		overviewEnchantsBadge = UIComponents.label(Component.literal(enchCount + " Enchantments"));
+		overviewEnchantsBadge.color(Color.ofRgb(enchCount > 0 ? COLOR_ORANGE_HOVER : COLOR_TEXT_MUTED));
+		previewCard.child(overviewEnchantsBadge);
+
+		int attrCount = Presets.currentAttributes(root, registries).size();
+		overviewAttributesBadge = UIComponents.label(Component.literal(attrCount + " Modifiers"));
+		overviewAttributesBadge.color(Color.ofRgb(attrCount > 0 ? COLOR_ORANGE_HOVER : COLOR_TEXT_MUTED));
+		previewCard.child(overviewAttributesBadge);
+
+		container.child(previewCard);
+
+		// Right Card: Controls
+		FlowLayout controlsLayout = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		controlsLayout.padding(Insets.of(10));
+		controlsLayout.gap(8);
+
+		// --- Section: Custom Name ---
+		FlowLayout nameSection = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		nameSection.surface(INSET_SURFACE);
+		nameSection.padding(Insets.of(8));
+		nameSection.gap(6);
+
+		LabelComponent nameLabel = UIComponents.label(Component.literal("Custom Name"));
+		nameLabel.color(Color.ofRgb(COLOR_ORANGE_PRIMARY)).shadow(true);
+		nameSection.child(nameLabel);
+
+		TextBoxComponent nameBox = UIComponents.textBox(Sizing.fill(100));
+		nameBox.setMaxLength(256);
+		nameBox.text(Presets.currentName(root, registries));
+		nameSection.child(nameBox);
+
+		// Format toggles
+		FlowLayout formatBar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+		formatBar.gap(4);
+		formatBar.verticalAlignment(VerticalAlignment.CENTER);
+
+		ButtonComponent btnB = createFormatToggle("B", fmtBold, () -> { fmtBold = !fmtBold; applyRename(nameBox.getValue()); });
+		ButtonComponent btnI = createFormatToggle("I", fmtItalic, () -> { fmtItalic = !fmtItalic; applyRename(nameBox.getValue()); });
+		ButtonComponent btnU = createFormatToggle("U", fmtUnderline, () -> { fmtUnderline = !fmtUnderline; applyRename(nameBox.getValue()); });
+		ButtonComponent btnS = createFormatToggle("S", fmtStrike, () -> { fmtStrike = !fmtStrike; applyRename(nameBox.getValue()); });
+		ButtonComponent btnK = createFormatToggle("K", fmtObfuscated, () -> { fmtObfuscated = !fmtObfuscated; applyRename(nameBox.getValue()); });
+
+		formatBar.child(btnB).child(btnI).child(btnU).child(btnS).child(btnK);
+		nameSection.child(formatBar);
+
+		// Swatches
+		FlowLayout swatchesRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		swatchesRow.gap(3);
+		swatchesRow.verticalAlignment(VerticalAlignment.CENTER);
+
+		// Clear color swatch
+		ButtonComponent clearSwatch = UIComponents.button(Component.literal("×"), b -> {
+			nameColor = null;
+			applyRename(nameBox.getValue());
+		});
+		clearSwatch.sizing(Sizing.fixed(16), Sizing.fixed(16));
+		clearSwatch.renderer(BTN_STANDARD);
+		clearSwatch.tooltip(Component.literal("Default Color"));
+		swatchesRow.child(clearSwatch);
+
+		for (ChatFormatting cf : NAME_COLORS) {
+			Integer rgb = cf.getColor();
+			int col = rgb != null ? rgb : 0xFFFFFF;
+			BoxComponent swatch = UIComponents.box(Sizing.fixed(16), Sizing.fixed(16));
+			swatch.fill(true);
+			swatch.color(Color.ofRgb(col));
+			swatch.tooltip(Component.literal(cf.getName()).withStyle(cf));
+			swatch.cursorStyle(CursorStyle.HAND);
+			swatch.mouseDown().subscribe((event, doubleClick) -> {
+				nameColor = cf;
+				applyRename(nameBox.getValue());
+				return true;
+			});
+			swatchesRow.child(swatch);
 		}
-		return null;
+		nameSection.child(swatchesRow);
+
+		nameBox.onChanged().subscribe(val -> applyRename(val));
+		controlsLayout.child(nameSection);
+
+		// --- Section: Item Count ---
+		FlowLayout countSection = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		countSection.surface(INSET_SURFACE);
+		countSection.padding(Insets.of(8));
+		countSection.gap(6);
+
+		LabelComponent countLabel = UIComponents.label(Component.literal("Item Count"));
+		countLabel.color(Color.ofRgb(COLOR_ORANGE_PRIMARY)).shadow(true);
+		countSection.child(countLabel);
+
+		FlowLayout countControls = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+		countControls.gap(4);
+		countControls.verticalAlignment(VerticalAlignment.CENTER);
+
+		TextBoxComponent countBox = UIComponents.textBox(Sizing.fixed(50));
+		countBox.text(Integer.toString(Presets.currentCount(root)));
+
+		ButtonComponent btnDec = UIComponents.button(Component.literal("-"), b -> {
+			int c = Math.max(1, Presets.currentCount(root) - 1);
+			Presets.setCount(root, c);
+			countBox.text(Integer.toString(c));
+			updatePreview();
+			setStatus("Count set to " + c, false);
+		});
+		btnDec.sizing(Sizing.fixed(20), Sizing.fixed(20));
+		btnDec.renderer(BTN_STANDARD);
+
+		ButtonComponent btnInc = UIComponents.button(Component.literal("+"), b -> {
+			int c = Presets.currentCount(root) + 1;
+			Presets.setCount(root, c);
+			countBox.text(Integer.toString(c));
+			updatePreview();
+			setStatus("Count set to " + c, false);
+		});
+		btnInc.sizing(Sizing.fixed(20), Sizing.fixed(20));
+		btnInc.renderer(BTN_STANDARD);
+
+		countControls.child(btnDec).child(countBox).child(btnInc);
+
+		int[] presets = {1, 16, 64, 99};
+		for (int p : presets) {
+			ButtonComponent pBtn = UIComponents.button(Component.literal(Integer.toString(p)), b -> {
+				Presets.setCount(root, p);
+				countBox.text(Integer.toString(p));
+				updatePreview();
+				setStatus("Count set to " + p, false);
+			});
+			pBtn.sizing(Sizing.fixed(32), Sizing.fixed(20));
+			pBtn.renderer(BTN_STANDARD);
+			countControls.child(pBtn);
+		}
+
+		countBox.onChanged().subscribe(val -> {
+			try {
+				int c = Math.max(1, Integer.parseInt(val.trim()));
+				Presets.setCount(root, c);
+				updatePreview();
+			} catch (NumberFormatException ignored) {}
+		});
+		countSection.child(countControls);
+		controlsLayout.child(countSection);
+
+		// --- Section: Unbreakable ---
+		FlowLayout propSection = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		propSection.surface(INSET_SURFACE);
+		propSection.padding(Insets.of(8));
+		propSection.gap(6);
+
+		CheckboxComponent unbreakBox = UIComponents.checkbox(Component.literal("Unbreakable (Ignore durability damage)"));
+		unbreakBox.checked(Presets.hasComponent(root, DataComponents.UNBREAKABLE));
+		unbreakBox.onChanged(checked -> {
+			Presets.toggleUnbreakable(root, registries);
+			updatePreview();
+			setStatus(Presets.hasComponent(root, DataComponents.UNBREAKABLE) ? "Unbreakable enabled." : "Unbreakable disabled.", false);
+		});
+		propSection.child(unbreakBox);
+		controlsLayout.child(propSection);
+
+		ScrollContainer<FlowLayout> controlsScroll = UIContainers.verticalScroll(Sizing.expand(100), Sizing.fill(100), controlsLayout);
+		controlsScroll.surface(CARD_SURFACE);
+		container.child(controlsScroll);
+
+		return container;
 	}
 
-	private void select(Tag parent, String key, int index) {
-		commitKeyRename();
-		preset = Preset.NONE;
-		presetStatus = "";
-		selParent = parent;
-		selKey = key;
-		selIndex = index;
-		syncPanel();
+	private ButtonComponent createFormatToggle(String label, boolean initial, Runnable action) {
+		ButtonComponent btn = UIComponents.button(Component.literal(label), null);
+		btn.sizing(Sizing.fixed(20), Sizing.fixed(20));
+		btn.renderer(initial ? BTN_ORANGE : BTN_STANDARD);
+		btn.onPress(b -> {
+			action.run();
+			boolean current = switch (label) {
+				case "B" -> fmtBold;
+				case "I" -> fmtItalic;
+				case "U" -> fmtUnderline;
+				case "S" -> fmtStrike;
+				case "K" -> fmtObfuscated;
+				default -> false;
+			};
+			b.renderer(current ? BTN_ORANGE : BTN_STANDARD);
+		});
+		return btn;
 	}
 
-	private void clearSelection() {
-		selParent = null;
-		selKey = null;
-		selIndex = -1;
-		syncPanel();
+	private void applyRename(String text) {
+		Presets.renameStyled(root, registries, text, fmtBold, fmtItalic, fmtUnderline, fmtStrike, fmtObfuscated, nameColor);
+		updatePreview();
+		if (overviewNamePreview != null) {
+			overviewNamePreview.text(currentStack.getHoverName());
+		}
 	}
 
-	private void replaceSelected(Tag newTag) {
-		if (selParent instanceof CompoundTag c && selKey != null) {
-			c.put(selKey, newTag);
-		} else if (selParent instanceof ListTag l && selIndex >= 0) {
-			if (!l.setTag(selIndex, newTag)) {
-				// List requires homogeneous element types; refuse mismatched replacement.
-				NbtEditor.LOGGER.warn("List rejected element of a different type");
+	// ==========================================
+	// TAB 2: ENCHANTMENTS
+	// ==========================================
+	private FlowLayout buildEnchantsTab() {
+		FlowLayout container = UIContainers.verticalFlow(Sizing.fill(100), Sizing.fill(100));
+		container.gap(6);
+
+		// Search toolbar
+		FlowLayout toolbar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(26));
+		toolbar.surface(PANEL_SURFACE);
+		toolbar.padding(Insets.both(6, 3));
+		toolbar.gap(8);
+		toolbar.verticalAlignment(VerticalAlignment.CENTER);
+
+		TextBoxComponent searchBox = UIComponents.textBox(Sizing.fixed(180));
+		searchBox.setMaxLength(64);
+		searchBox.setHint(Component.literal("Search enchantments..."));
+		searchBox.text(enchantSearchQuery);
+		toolbar.child(searchBox);
+
+		CheckboxComponent activeOnly = UIComponents.checkbox(Component.literal("Active Only"));
+		activeOnly.checked(enchantOnlyActive);
+		toolbar.child(activeOnly);
+
+		SpacerComponent sp = UIComponents.spacer();
+		toolbar.child(sp);
+
+		ButtonComponent clearAll = UIComponents.button(Component.literal("Remove All"), b -> {
+			Map<String, Integer> current = Presets.currentEnchantments(root, registries);
+			for (String id : current.keySet()) {
+				Presets.setEnchantment(root, registries, id, 0);
 			}
+			updatePreview();
+			switchTab(Tab.ENCHANTS);
+			setStatus("Removed all enchantments.", false);
+		});
+		clearAll.sizing(Sizing.fixed(80), Sizing.fixed(20));
+		clearAll.renderer(BTN_STANDARD);
+		toolbar.child(clearAll);
+
+		container.child(toolbar);
+
+		// List container
+		FlowLayout listLayout = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		listLayout.gap(4);
+		listLayout.padding(Insets.of(4));
+
+		populateEnchantsList(listLayout);
+
+		searchBox.onChanged().subscribe(val -> {
+			enchantSearchQuery = val.trim().toLowerCase(Locale.ROOT);
+			populateEnchantsList(listLayout);
+		});
+
+		activeOnly.onChanged(checked -> {
+			enchantOnlyActive = checked;
+			populateEnchantsList(listLayout);
+		});
+
+		ScrollContainer<FlowLayout> scroll = UIContainers.verticalScroll(Sizing.fill(100), Sizing.expand(100), listLayout);
+		scroll.surface(CARD_SURFACE);
+		container.child(scroll);
+
+		return container;
+	}
+
+	private void populateEnchantsList(FlowLayout listLayout) {
+		listLayout.clearChildren();
+		Map<String, Integer> currentEnchants = Presets.currentEnchantments(root, registries);
+
+		for (Identifier id : allEnchants) {
+			String idStr = id.toString();
+			boolean active = currentEnchants.containsKey(idStr);
+			if (enchantOnlyActive && !active) {
+				continue;
+			}
+			if (!enchantSearchQuery.isEmpty() && !idStr.toLowerCase(Locale.ROOT).contains(enchantSearchQuery)) {
+				continue;
+			}
+
+			int currentLevel = currentEnchants.getOrDefault(idStr, 0);
+
+			FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(28));
+			row.surface(active ? ACTIVE_CARD_SURFACE : CARD_SURFACE);
+			row.padding(Insets.both(8, 4));
+			row.gap(6);
+			row.verticalAlignment(VerticalAlignment.CENTER);
+
+			LabelComponent nameLabel = UIComponents.label(Component.literal(idStr));
+			nameLabel.color(Color.ofRgb(active ? COLOR_ORANGE_HOVER : 0xEEEEEE));
+			row.child(nameLabel);
+
+			if (active) {
+				LabelComponent lvlBadge = UIComponents.label(Component.literal(" [Lvl " + currentLevel + "]"));
+				lvlBadge.color(Color.ofRgb(COLOR_ORANGE_PRIMARY)).shadow(true);
+				row.child(lvlBadge);
+			}
+
+			row.child(UIComponents.spacer());
+
+			TextBoxComponent lvlBox = UIComponents.textBox(Sizing.fixed(32));
+			lvlBox.text(Integer.toString(Math.max(1, currentLevel)));
+
+			ButtonComponent decBtn = UIComponents.button(Component.literal("-"), b -> {
+				int next = currentLevel - 1;
+				Presets.setEnchantment(root, registries, idStr, Math.max(0, next));
+				updatePreview();
+				populateEnchantsList(listLayout);
+				setStatus(next <= 0 ? "Removed " + idStr : "Set " + idStr + " to " + next, false);
+			});
+			decBtn.sizing(Sizing.fixed(20), Sizing.fixed(20));
+			decBtn.renderer(BTN_STANDARD);
+
+			ButtonComponent incBtn = UIComponents.button(Component.literal("+"), b -> {
+				int next = currentLevel <= 0 ? 1 : currentLevel + 1;
+				Presets.setEnchantment(root, registries, idStr, next);
+				updatePreview();
+				populateEnchantsList(listLayout);
+				setStatus("Set " + idStr + " to " + next, false);
+			});
+			incBtn.sizing(Sizing.fixed(20), Sizing.fixed(20));
+			incBtn.renderer(BTN_STANDARD);
+
+			ButtonComponent setBtn = UIComponents.button(Component.literal(active ? "Update" : "Add"), b -> {
+				int lvl = 1;
+				try {
+					lvl = Math.max(1, Integer.parseInt(lvlBox.getValue().trim()));
+				} catch (NumberFormatException ignored) {}
+				Presets.setEnchantment(root, registries, idStr, lvl);
+				updatePreview();
+				populateEnchantsList(listLayout);
+				setStatus("Set " + idStr + " to " + lvl, false);
+			});
+			setBtn.sizing(Sizing.fixed(45), Sizing.fixed(20));
+			setBtn.renderer(active ? BTN_ORANGE : BTN_STANDARD);
+
+			ButtonComponent removeBtn = UIComponents.button(Component.literal("×"), b -> {
+				Presets.setEnchantment(root, registries, idStr, 0);
+				updatePreview();
+				populateEnchantsList(listLayout);
+				setStatus("Removed " + idStr, false);
+			});
+			removeBtn.sizing(Sizing.fixed(20), Sizing.fixed(20));
+			removeBtn.renderer(BTN_STANDARD);
+			removeBtn.active(active);
+
+			row.child(decBtn).child(lvlBox).child(incBtn).child(setBtn).child(removeBtn);
+			listLayout.child(row);
 		}
 	}
 
-	/** Refresh the bottom-panel widgets to reflect the current selection (or active preset). */
-	private void syncPanel() {
-		updateToolLabels();
-		if (preset == Preset.ATTRIBUTES) {
-			keyBox.visible = keyBox.active = true;   // filter
-			valueBox.visible = valueBox.active = true; // amount
-			// In attribute mode the tree-tool buttons drive slot / operation / remove.
-			addBtn.active = true;
-			typeBtn.active = true;
-			deleteBtn.active = attrSelectedId != null;
-			return;
-		}
-		if (preset == Preset.ENCHANT) {
-			keyBox.visible = keyBox.active = true;   // filter
-			valueBox.visible = valueBox.active = true; // level
-			addBtn.active = deleteBtn.active = typeBtn.active = false;
-			return;
-		}
-		if (preset == Preset.RENAME || preset == Preset.COUNT) {
-			keyBox.visible = keyBox.active = false;
-			valueBox.visible = valueBox.active = true;
-			addBtn.active = deleteBtn.active = typeBtn.active = false;
-			return;
-		}
+	// ==========================================
+	// TAB 3: ATTRIBUTES
+	// ==========================================
+	private FlowLayout buildAttributesTab() {
+		FlowLayout container = UIContainers.verticalFlow(Sizing.fill(100), Sizing.fill(100));
+		container.gap(6);
 
-		Tag t = selectedTag();
-		boolean sel = t != null;
+		// Toolbar
+		FlowLayout toolbar = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(26));
+		toolbar.surface(PANEL_SURFACE);
+		toolbar.padding(Insets.both(6, 3));
+		toolbar.gap(8);
+		toolbar.verticalAlignment(VerticalAlignment.CENTER);
 
-		boolean canRenameKey = sel && selKey != null;
-		keyBox.visible = canRenameKey;
-		keyBox.active = canRenameKey;
-		setBox(keyBox, canRenameKey ? selKey : "");
-		if (!canRenameKey) {
-			keyBox.setFocused(false);
-		}
+		TextBoxComponent searchBox = UIComponents.textBox(Sizing.fixed(180));
+		searchBox.setMaxLength(64);
+		searchBox.setHint(Component.literal("Search attributes..."));
+		searchBox.text(attributeSearchQuery);
+		toolbar.child(searchBox);
 
-		boolean isScalar = t instanceof NumericTag || t instanceof StringTag;
-		valueBox.visible = isScalar;
-		valueBox.active = isScalar;
-		setBox(valueBox, isScalar ? leafText(t) : "");
-		if (!isScalar) {
-			valueBox.setFocused(false);
-		}
+		CheckboxComponent activeOnly = UIComponents.checkbox(Component.literal("Active Only"));
+		activeOnly.checked(attributeOnlyActive);
+		toolbar.child(activeOnly);
 
-		deleteBtn.active = sel;
-		typeBtn.active = sel;
-		addBtn.active = true;
+		toolbar.child(UIComponents.spacer());
+
+		ButtonComponent clearAll = UIComponents.button(Component.literal("Remove All"), b -> {
+			Map<String, String> current = Presets.currentAttributes(root, registries);
+			for (String id : current.keySet()) {
+				Presets.removeAttribute(root, registries, id);
+			}
+			updatePreview();
+			switchTab(Tab.ATTRIBUTES);
+			setStatus("Removed all attribute modifiers.", false);
+		});
+		clearAll.sizing(Sizing.fixed(80), Sizing.fixed(20));
+		clearAll.renderer(BTN_STANDARD);
+		toolbar.child(clearAll);
+
+		container.child(toolbar);
+
+		// List container
+		FlowLayout listLayout = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		listLayout.gap(4);
+		listLayout.padding(Insets.of(4));
+
+		populateAttributesList(listLayout);
+
+		searchBox.onChanged().subscribe(val -> {
+			attributeSearchQuery = val.trim().toLowerCase(Locale.ROOT);
+			populateAttributesList(listLayout);
+		});
+
+		activeOnly.onChanged(checked -> {
+			attributeOnlyActive = checked;
+			populateAttributesList(listLayout);
+		});
+
+		ScrollContainer<FlowLayout> scroll = UIContainers.verticalScroll(Sizing.fill(100), Sizing.expand(100), listLayout);
+		scroll.surface(CARD_SURFACE);
+		container.child(scroll);
+
+		return container;
 	}
 
-	/**
-	 * In attribute mode the tree-tool buttons are repurposed to drive the modifier's slot,
-	 * operation and removal; every other mode shows their normal tree labels.
-	 */
-	private void updateToolLabels() {
-		if (preset == Preset.ATTRIBUTES) {
-			addBtn.setMessage(Component.literal("Slot: " + Presets.slotLabel(Presets.SLOT_GROUPS.get(attrSlotIndex))));
-			typeBtn.setMessage(Component.literal("Op: " + Presets.operationLabel(Presets.OPERATIONS.get(attrOpIndex))));
-			deleteBtn.setMessage(Component.literal("Remove"));
+	private void populateAttributesList(FlowLayout listLayout) {
+		listLayout.clearChildren();
+		Map<String, String> currentAttrs = Presets.currentAttributes(root, registries);
+
+		for (Identifier id : allAttributes) {
+			String idStr = id.toString();
+			boolean active = currentAttrs.containsKey(idStr);
+			if (attributeOnlyActive && !active) {
+				continue;
+			}
+			if (!attributeSearchQuery.isEmpty() && !idStr.toLowerCase(Locale.ROOT).contains(attributeSearchQuery)) {
+				continue;
+			}
+
+			String summary = currentAttrs.get(idStr);
+
+			FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(28));
+			row.surface(active ? ACTIVE_CARD_SURFACE : CARD_SURFACE);
+			row.padding(Insets.both(8, 4));
+			row.gap(6);
+			row.verticalAlignment(VerticalAlignment.CENTER);
+
+			LabelComponent nameLabel = UIComponents.label(Component.literal(idStr));
+			nameLabel.color(Color.ofRgb(active ? COLOR_ORANGE_HOVER : 0xEEEEEE));
+			row.child(nameLabel);
+
+			if (summary != null) {
+				LabelComponent summaryBadge = UIComponents.label(Component.literal(" [" + summary + "]"));
+				summaryBadge.color(Color.ofRgb(COLOR_ORANGE_PRIMARY)).shadow(true);
+				row.child(summaryBadge);
+			}
+
+			row.child(UIComponents.spacer());
+
+			TextBoxComponent amountBox = UIComponents.textBox(Sizing.fixed(40));
+			Optional<Presets.AttributeState> state = Presets.currentAttribute(root, registries, idStr);
+			amountBox.text(state.map(s -> Presets.formatAmount(s.amount()).replace("+", "")).orElse("1.0"));
+
+			final int[] localSlot = {state.map(s -> Presets.SLOT_GROUPS.indexOf(s.slot())).orElse(0)};
+			final int[] localOp = {state.map(s -> Presets.OPERATIONS.indexOf(s.operation())).orElse(0)};
+			if (localSlot[0] < 0) localSlot[0] = 0;
+			if (localOp[0] < 0) localOp[0] = 0;
+
+			ButtonComponent slotBtn = UIComponents.button(Component.literal(Presets.slotLabel(Presets.SLOT_GROUPS.get(localSlot[0]))), null);
+			slotBtn.sizing(Sizing.fixed(60), Sizing.fixed(20));
+			slotBtn.renderer(BTN_STANDARD);
+			slotBtn.onPress(b -> {
+				localSlot[0] = (localSlot[0] + 1) % Presets.SLOT_GROUPS.size();
+				b.setMessage(Component.literal(Presets.slotLabel(Presets.SLOT_GROUPS.get(localSlot[0]))));
+			});
+
+			ButtonComponent opBtn = UIComponents.button(Component.literal(Presets.operationLabel(Presets.OPERATIONS.get(localOp[0]))), null);
+			opBtn.sizing(Sizing.fixed(50), Sizing.fixed(20));
+			opBtn.renderer(BTN_STANDARD);
+			opBtn.onPress(b -> {
+				localOp[0] = (localOp[0] + 1) % Presets.OPERATIONS.size();
+				b.setMessage(Component.literal(Presets.operationLabel(Presets.OPERATIONS.get(localOp[0]))));
+			});
+
+			ButtonComponent applyBtn = UIComponents.button(Component.literal(active ? "Update" : "Add"), b -> {
+				double amount = 1.0;
+				try {
+					amount = Double.parseDouble(amountBox.getValue().trim());
+				} catch (NumberFormatException ignored) {}
+				Presets.setAttribute(root, registries, idStr, amount, Presets.OPERATIONS.get(localOp[0]), Presets.SLOT_GROUPS.get(localSlot[0]));
+				updatePreview();
+				populateAttributesList(listLayout);
+				setStatus("Set modifier for " + idStr, false);
+			});
+			applyBtn.sizing(Sizing.fixed(45), Sizing.fixed(20));
+			applyBtn.renderer(active ? BTN_ORANGE : BTN_STANDARD);
+
+			ButtonComponent removeBtn = UIComponents.button(Component.literal("×"), b -> {
+				Presets.removeAttribute(root, registries, idStr);
+				updatePreview();
+				populateAttributesList(listLayout);
+				setStatus("Removed modifier for " + idStr, false);
+			});
+			removeBtn.sizing(Sizing.fixed(20), Sizing.fixed(20));
+			removeBtn.renderer(BTN_STANDARD);
+			removeBtn.active(active);
+
+			row.child(amountBox).child(opBtn).child(slotBtn).child(applyBtn).child(removeBtn);
+			listLayout.child(row);
+		}
+	}
+
+	// ==========================================
+	// TAB 4: RAW NBT TREE EXPLORER
+	// ==========================================
+	private FlowLayout buildTreeTab() {
+		FlowLayout container = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(100));
+		container.gap(8);
+
+		// Left Pane: Tree View
+		FlowLayout treeCard = UIContainers.verticalFlow(Sizing.expand(62), Sizing.fill(100));
+		treeCard.surface(CARD_SURFACE);
+		treeCard.padding(Insets.of(6));
+		treeCard.gap(4);
+
+		FlowLayout treeHeader = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+		treeHeader.verticalAlignment(VerticalAlignment.CENTER);
+		LabelComponent treeTitle = UIComponents.label(Component.literal("Tag Hierarchy"));
+		treeTitle.color(Color.ofRgb(COLOR_ORANGE_PRIMARY)).shadow(true);
+		treeHeader.child(treeTitle);
+		treeHeader.child(UIComponents.spacer());
+
+		ButtonComponent btnAddRoot = UIComponents.button(Component.literal("+ Add Key"), b -> {
+			String key = uniqueKey(root);
+			root.putString(key, "");
+			selectedTagParent = root;
+			selectedTagKey = key;
+			selectedTagIndex = -1;
+			updatePreview();
+			switchTab(Tab.TREE);
+		});
+		btnAddRoot.sizing(Sizing.fixed(65), Sizing.fixed(18));
+		btnAddRoot.renderer(BTN_STANDARD);
+		treeHeader.child(btnAddRoot);
+
+		treeCard.child(treeHeader);
+
+		FlowLayout treeList = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		treeList.gap(2);
+		populateTreeRows(treeList, root, null, null, -1, 0);
+
+		ScrollContainer<FlowLayout> treeScroll = UIContainers.verticalScroll(Sizing.fill(100), Sizing.expand(100), treeList);
+		treeCard.child(treeScroll);
+		container.child(treeCard);
+
+		// Right Pane: Node Inspector
+		treeInspectorContainer = UIContainers.verticalFlow(Sizing.expand(38), Sizing.fill(100));
+		treeInspectorContainer.surface(PANEL_SURFACE);
+		treeInspectorContainer.padding(Insets.of(10));
+		treeInspectorContainer.gap(8);
+		refreshInspector();
+		container.child(treeInspectorContainer);
+
+		return container;
+	}
+
+	private void populateTreeRows(FlowLayout treeList, Tag tag, Tag parent, String key, int index, int depth) {
+		boolean isContainer = tag instanceof CompoundTag || tag instanceof ListTag;
+		boolean isSelected = isSelectedTag(parent, key, index);
+
+		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+		row.surface(isSelected ? ACTIVE_CARD_SURFACE : Surface.BLANK);
+		row.padding(Insets.both(depth * 10 + 4, 2));
+		row.gap(4);
+		row.verticalAlignment(VerticalAlignment.CENTER);
+
+		// Expand/collapse arrow
+		if (isContainer) {
+			boolean isExpanded = expandedTags.contains(tag);
+			LabelComponent arrow = UIComponents.label(Component.literal(isExpanded ? "▾" : "▸"));
+			arrow.color(Color.ofRgb(COLOR_ORANGE_PRIMARY));
+			arrow.cursorStyle(CursorStyle.HAND);
+			arrow.mouseDown().subscribe((e, dbl) -> {
+				if (expandedTags.contains(tag)) {
+					expandedTags.remove(tag);
+				} else {
+					expandedTags.add(tag);
+				}
+				switchTab(Tab.TREE);
+				return true;
+			});
+			row.child(arrow);
 		} else {
-			addBtn.setMessage(Component.literal("Add"));
-			deleteBtn.setMessage(Component.literal("Delete"));
-			typeBtn.setMessage(Component.literal("Type >"));
+			row.child(UIComponents.label(Component.literal("  ")));
 		}
-	}
 
-	/** Set an edit box value without triggering its live responder. */
-	private void setBox(EditBox box, String value) {
-		suppressResponder = true;
-		box.setValue(value);
-		suppressResponder = false;
-	}
+		// Type badge
+		LabelComponent typeBadge = UIComponents.label(Component.literal("[" + typeBadgeName(tag.getId()) + "]"));
+		typeBadge.color(Color.ofRgb(typeBadgeColor(tag.getId())));
+		row.child(typeBadge);
 
-	// ---- live editing ----
-	private void onValueChanged(String text) {
-		if (suppressResponder) {
-			return;
-		}
-		switch (preset) {
-			case RENAME -> applyRename();
-			case COUNT -> {
-				Presets.setCount(root, (int) parseLong(text));
-				presetStatus = "Count set to " + Presets.currentCount(root) + ".";
+		// Key or index label
+		String name = key != null ? key : "[" + index + "]";
+		LabelComponent nameLabel = UIComponents.label(Component.literal(name));
+		nameLabel.color(Color.ofRgb(isSelected ? COLOR_ORANGE_HOVER : 0xFFFFFF));
+		row.child(nameLabel);
+
+		// Value preview
+		if (!isContainer) {
+			String valStr = leafText(tag);
+			if (valStr.length() > 24) {
+				valStr = valStr.substring(0, 21) + "...";
 			}
-			case ENCHANT -> applyEnchantLevel();
-			case ATTRIBUTES -> applyAttributeAmount();
-			case NONE -> {
-				Tag t = selectedTag();
-				if (t instanceof NumericTag || t instanceof StringTag) {
-					replaceSelected(createTag(t.getId(), text));
+			LabelComponent valLabel = UIComponents.label(Component.literal(": " + valStr));
+			valLabel.color(Color.ofRgb(COLOR_TEXT_MUTED));
+			row.child(valLabel);
+		} else {
+			int sz = (tag instanceof CompoundTag c) ? c.size() : ((ListTag) tag).size();
+			LabelComponent szLabel = UIComponents.label(Component.literal(" (" + sz + ")"));
+			szLabel.color(Color.ofRgb(COLOR_TEXT_MUTED));
+			row.child(szLabel);
+		}
+
+		row.cursorStyle(CursorStyle.HAND);
+		row.mouseDown().subscribe((e, dbl) -> {
+			selectedTagParent = parent;
+			selectedTagKey = key;
+			selectedTagIndex = index;
+			if (dbl && isContainer) {
+				if (expandedTags.contains(tag)) {
+					expandedTags.remove(tag);
+				} else {
+					expandedTags.add(tag);
+				}
+			}
+			switchTab(Tab.TREE);
+			return true;
+		});
+
+		treeList.child(row);
+
+		// Recursively add children if expanded
+		if (isContainer && expandedTags.contains(tag)) {
+			if (tag instanceof CompoundTag comp) {
+				List<String> keys = new ArrayList<>(comp.keySet());
+				Collections.sort(keys);
+				for (String k : keys) {
+					populateTreeRows(treeList, comp.get(k), comp, k, -1, depth + 1);
+				}
+			} else if (tag instanceof ListTag list) {
+				for (int i = 0; i < list.size(); i++) {
+					populateTreeRows(treeList, list.get(i), list, null, i, depth + 1);
 				}
 			}
 		}
 	}
 
-	/** Commit a pending key rename (called when the key box loses focus or before Save). */
-	private void commitKeyRename() {
-		if (preset != Preset.NONE || keyBox == null || !keyBox.visible) {
+	private void refreshInspector() {
+		if (treeInspectorContainer == null) {
 			return;
 		}
-		Tag t = selectedTag();
-		if (t == null || selKey == null) {
-			return;
-		}
-		String newKey = keyBox.getValue().trim();
-		if (newKey.isEmpty() || newKey.equals(selKey)) {
-			return;
-		}
-		if (selParent instanceof CompoundTag c && !c.contains(newKey)) {
-			c.remove(selKey);
-			c.put(newKey, t);
-			selKey = newKey;
-		}
-	}
+		treeInspectorContainer.clearChildren();
 
-	// ---- presets ----
-	private void beginPreset(Preset p) {
-		commitKeyRename();
-		selParent = null;
-		selKey = null;
-		selIndex = -1;
-		preset = p;
-		presetStatus = "";
-		enchSelectedId = null;
-		attrSelectedId = null;
-		scroll = 0;
-		setBox(keyBox, "");
-		setBox(valueBox, switch (p) {
-			case RENAME -> Presets.currentName(root, registries);
-			case COUNT -> Integer.toString(Presets.currentCount(root));
-			default -> "";
+		LabelComponent title = UIComponents.label(Component.literal("Tag Inspector"));
+		title.color(Color.ofRgb(COLOR_ORANGE_PRIMARY)).shadow(true);
+		treeInspectorContainer.child(title);
+
+		Tag selected = getSelectedTag();
+		if (selected == null) {
+			LabelComponent hint = UIComponents.label(Component.literal("Click any node in the tree to inspect and edit its properties."));
+			hint.color(Color.ofRgb(COLOR_TEXT_MUTED));
+			treeInspectorContainer.child(hint);
+			return;
+		}
+
+		// Selected Path info
+		String desc = selectedTagKey != null ? "Key: " + selectedTagKey : "Index: [" + selectedTagIndex + "]";
+		LabelComponent pathLabel = UIComponents.label(Component.literal(desc + " (" + typeName(selected.getId()) + ")"));
+		pathLabel.color(Color.ofRgb(COLOR_ORANGE_HOVER));
+		treeInspectorContainer.child(pathLabel);
+
+		// Key rename (if in compound)
+		if (selectedTagParent instanceof CompoundTag parentComp && selectedTagKey != null) {
+			LabelComponent keyHeader = UIComponents.label(Component.literal("Key Name"));
+			keyHeader.color(Color.ofRgb(COLOR_TEXT_MUTED));
+			treeInspectorContainer.child(keyHeader);
+
+			TextBoxComponent keyBox = UIComponents.textBox(Sizing.fill(100));
+			keyBox.text(selectedTagKey);
+			keyBox.onChanged().subscribe(newKey -> {
+				newKey = newKey.trim();
+				if (!newKey.isEmpty() && !newKey.equals(selectedTagKey) && !parentComp.contains(newKey)) {
+					parentComp.remove(selectedTagKey);
+					parentComp.put(newKey, selected);
+					selectedTagKey = newKey;
+					updatePreview();
+				}
+			});
+			treeInspectorContainer.child(keyBox);
+		}
+
+		// Scalar value editor
+		if (selected instanceof NumericTag || selected instanceof StringTag) {
+			LabelComponent valHeader = UIComponents.label(Component.literal("Tag Value"));
+			valHeader.color(Color.ofRgb(COLOR_TEXT_MUTED));
+			treeInspectorContainer.child(valHeader);
+
+			TextBoxComponent valBox = UIComponents.textBox(Sizing.fill(100));
+			valBox.text(leafText(selected));
+			valBox.onChanged().subscribe(newVal -> {
+				replaceSelectedTag(createTag(selected.getId(), newVal));
+				updatePreview();
+			});
+			treeInspectorContainer.child(valBox);
+		}
+
+		// Tag type changer
+		LabelComponent typeHeader = UIComponents.label(Component.literal("Tag Type: " + typeName(selected.getId())));
+		typeHeader.color(Color.ofRgb(COLOR_TEXT_MUTED));
+		treeInspectorContainer.child(typeHeader);
+
+		ButtonComponent cycleTypeBtn = UIComponents.button(Component.literal("Change Type >"), b -> {
+			int cur = selected.getId();
+			int idx = 0;
+			for (int j = 0; j < TYPE_CYCLE.length; j++) {
+				if (TYPE_CYCLE[j] == cur) {
+					idx = j;
+					break;
+				}
+			}
+			int next = TYPE_CYCLE[(idx + 1) % TYPE_CYCLE.length];
+			replaceSelectedTag(createTag(next, leafText(selected)));
+			updatePreview();
+			switchTab(Tab.TREE);
 		});
-		keyBox.setHint(Component.literal(switch (p) {
-			case ENCHANT -> "filter enchantments";
-			case ATTRIBUTES -> "filter attributes";
-			default -> "key";
-		}));
-		valueBox.setHint(Component.literal(switch (p) {
-			case RENAME -> "name (& colour codes)";
-			case COUNT -> "count";
-			case ENCHANT -> "level";
-			case ATTRIBUTES -> "amount";
-			default -> "value";
-		}));
-		if (p == Preset.ENCHANT || p == Preset.ATTRIBUTES) {
-			setBox(valueBox, "1");
-			// Route focus through the Screen (not just the widget) so keystrokes reach the filter.
-			setFocused(keyBox);
+		cycleTypeBtn.sizing(Sizing.fill(100), Sizing.fixed(20));
+		cycleTypeBtn.renderer(BTN_STANDARD);
+		treeInspectorContainer.child(cycleTypeBtn);
+
+		// Actions: Add Child & Delete
+		FlowLayout actionsRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(20));
+		actionsRow.gap(4);
+
+		if (selected instanceof CompoundTag || selected instanceof ListTag) {
+			ButtonComponent addChildBtn = UIComponents.button(Component.literal("+ Add Child"), b -> {
+				if (selected instanceof CompoundTag c) {
+					String newK = uniqueKey(c);
+					c.putString(newK, "");
+					expandedTags.add(c);
+					selectedTagParent = c;
+					selectedTagKey = newK;
+					selectedTagIndex = -1;
+				} else if (selected instanceof ListTag l) {
+					l.add(l.size(), StringTag.valueOf(""));
+					expandedTags.add(l);
+					selectedTagParent = l;
+					selectedTagKey = null;
+					selectedTagIndex = l.size() - 1;
+				}
+				updatePreview();
+				switchTab(Tab.TREE);
+			});
+			addChildBtn.sizing(Sizing.expand(50), Sizing.fixed(20));
+			addChildBtn.renderer(BTN_STANDARD);
+			actionsRow.child(addChildBtn);
 		}
-		if (p == Preset.RENAME) {
-			Style st = Presets.currentNameStyle(root, registries);
-			fmtBold = st.isBold();
-			fmtItalic = st.isItalic();
-			fmtUnderline = st.isUnderlined();
-			fmtStrike = st.isStrikethrough();
-			fmtObfuscated = st.isObfuscated();
-			nameColor = matchColor(st.getColor());
-			setFocused(valueBox);
+
+		ButtonComponent deleteBtn = UIComponents.button(Component.literal("Delete"), b -> {
+			if (selectedTagParent instanceof CompoundTag c && selectedTagKey != null) {
+				c.remove(selectedTagKey);
+			} else if (selectedTagParent instanceof ListTag l && selectedTagIndex >= 0 && selectedTagIndex < l.size()) {
+				l.remove(selectedTagIndex);
+			}
+			selectedTagParent = null;
+			selectedTagKey = null;
+			selectedTagIndex = -1;
+			updatePreview();
+			switchTab(Tab.TREE);
+		});
+		deleteBtn.sizing(Sizing.expand(50), Sizing.fixed(20));
+		deleteBtn.renderer(ButtonComponent.Renderer.flat(0xFF6B1A1A, 0xFFA02020, 0xFF301010));
+		actionsRow.child(deleteBtn);
+
+		treeInspectorContainer.child(actionsRow);
+	}
+
+	private boolean isSelectedTag(Tag parent, String key, int index) {
+		if (parent != selectedTagParent) {
+			return false;
 		}
-		syncPanel();
+		return selectedTagKey != null ? selectedTagKey.equals(key) : selectedTagIndex == index;
 	}
 
-	private void toggleUnbreakable() {
-		Presets.toggleUnbreakable(root, registries);
-		presetStatus = Presets.hasComponent(root, DataComponents.UNBREAKABLE) ? "Unbreakable on." : "Unbreakable off.";
-		expandComponents();
-	}
-
-	// ---- rename toolbar ----
-	/** Rebuild the custom name from the plain text plus the toolbar's format toggles and colour. */
-	private void applyRename() {
-		String text = valueBox.getValue();
-		Presets.renameStyled(root, registries, text,
-				fmtBold, fmtItalic, fmtUnderline, fmtStrike, fmtObfuscated, nameColor);
-		expandComponents();
-		presetStatus = text.isEmpty() ? "Custom name cleared." : "Renamed.";
-	}
-
-	/** Toggle format button i (B/I/U/S/K) and re-apply live. */
-	private void toggleFormat(int i) {
-		switch (i) {
-			case 0 -> fmtBold = !fmtBold;
-			case 1 -> fmtItalic = !fmtItalic;
-			case 2 -> fmtUnderline = !fmtUnderline;
-			case 3 -> fmtStrike = !fmtStrike;
-			case 4 -> fmtObfuscated = !fmtObfuscated;
-			default -> { return; }
+	private Tag getSelectedTag() {
+		if (selectedTagParent instanceof CompoundTag c && selectedTagKey != null) {
+			return c.get(selectedTagKey);
 		}
-		applyRename();
-		setFocused(valueBox);
+		if (selectedTagParent instanceof ListTag l && selectedTagIndex >= 0 && selectedTagIndex < l.size()) {
+			return l.get(selectedTagIndex);
+		}
+		return null;
 	}
 
-	/** Map a parsed name colour back to a swatch (null if none / not a vanilla colour). */
+	private void replaceSelectedTag(Tag newTag) {
+		if (selectedTagParent instanceof CompoundTag c && selectedTagKey != null) {
+			c.put(selectedTagKey, newTag);
+		} else if (selectedTagParent instanceof ListTag l && selectedTagIndex >= 0) {
+			l.setTag(selectedTagIndex, newTag);
+		}
+	}
+
+	// ==========================================
+	// HELPERS & LIFECYCLE
+	// ==========================================
+	private void updatePreview() {
+		DataResult<ItemStack> decoded = ItemNbt.decode(root, registries);
+		currentStack = decoded.result().orElse(currentStack);
+		if (headerItemIcon != null) {
+			headerItemIcon.stack(currentStack);
+		}
+		if (headerItemId != null) {
+			String itemId = root.getStringOr("id", "minecraft:air");
+			int count = Presets.currentCount(root);
+			headerItemId.text(Component.literal(itemId + " ×" + count).withStyle(s -> s.withColor(TextColor.fromRgb(COLOR_ORANGE_HOVER))));
+		}
+		if (overviewItemPreview != null) {
+			overviewItemPreview.stack(currentStack);
+		}
+		if (overviewNamePreview != null) {
+			overviewNamePreview.text(currentStack.getHoverName());
+		}
+		if (overviewCountBadge != null) {
+			overviewCountBadge.text(Component.literal("Count: " + Presets.currentCount(root)));
+		}
+		if (overviewDurabilityBadge != null) {
+			boolean unb = Presets.hasComponent(root, DataComponents.UNBREAKABLE);
+			overviewDurabilityBadge.text(Component.literal(unb ? "✦ Unbreakable" : "Durability: Standard"));
+			overviewDurabilityBadge.color(Color.ofRgb(unb ? COLOR_ORANGE_HOVER : COLOR_TEXT_MUTED));
+		}
+		if (overviewEnchantsBadge != null) {
+			int sz = Presets.currentEnchantments(root, registries).size();
+			overviewEnchantsBadge.text(Component.literal(sz + " Enchantments"));
+			overviewEnchantsBadge.color(Color.ofRgb(sz > 0 ? COLOR_ORANGE_HOVER : COLOR_TEXT_MUTED));
+		}
+		if (overviewAttributesBadge != null) {
+			int sz = Presets.currentAttributes(root, registries).size();
+			overviewAttributesBadge.text(Component.literal(sz + " Modifiers"));
+			overviewAttributesBadge.color(Color.ofRgb(sz > 0 ? COLOR_ORANGE_HOVER : COLOR_TEXT_MUTED));
+		}
+	}
+
+	private void setStatus(String message, boolean error) {
+		if (statusLabel != null) {
+			statusLabel.text(Component.literal(message));
+			statusLabel.color(Color.ofRgb(error ? 0xFFFF4444 : COLOR_ORANGE_HOVER));
+		}
+	}
+
+	private void save() {
+		ClientPlayNetworking.send(new EditItemPayload(playerInventory, syncId, slotIndex, root));
+		onClose();
+	}
+
 	private static ChatFormatting matchColor(TextColor color) {
 		if (color == null) {
 			return null;
@@ -438,253 +1114,15 @@ public class NbtEditorScreen extends Screen {
 		return null;
 	}
 
-	private int fmtRowY() { return LIST_TOP + 12; }
-	private int paletteTop() { return fmtRowY() + FMT_SIZE + 16; }
-	private int paletteCols() { return Math.max(1, (centralRight() - MARGIN + SWATCH_GAP) / (SWATCH + SWATCH_GAP)); }
-
-	/** Hit-test the rename toolbar; returns true if a toggle or swatch was clicked. */
-	private boolean handleRenamePaletteClick(int mx, int my) {
-		int fy = fmtRowY();
-		if (my >= fy && my < fy + FMT_SIZE) {
-			for (int i = 0; i < FMT_LETTERS.length; i++) {
-				int x = MARGIN + i * (FMT_SIZE + FMT_GAP);
-				if (mx >= x && mx < x + FMT_SIZE) {
-					toggleFormat(i);
-					return true;
-				}
-			}
-		}
-		int gridTop = paletteTop();
-		int cols = paletteCols();
-		if (mx >= MARGIN && my >= gridTop) {
-			int col = (mx - MARGIN) / (SWATCH + SWATCH_GAP);
-			int rowNo = (my - gridTop) / (SWATCH + SWATCH_GAP);
-			int cellX = MARGIN + col * (SWATCH + SWATCH_GAP);
-			int cellY = gridTop + rowNo * (SWATCH + SWATCH_GAP);
-			int idx = rowNo * cols + col;
-			if (col < cols && mx < cellX + SWATCH && my < cellY + SWATCH && idx >= 0 && idx <= NAME_COLORS.length) {
-				nameColor = idx == 0 ? null : NAME_COLORS[idx - 1];
-				applyRename();
-				setFocused(valueBox);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/** Apply the level box to the currently selected enchantment (0 removes it). */
-	private void applyEnchantLevel() {
-		if (enchSelectedId == null) {
-			return;
-		}
-		int level = (int) parseLong(valueBox.getValue());
-		if (Presets.setEnchantment(root, registries, enchSelectedId, level)) {
-			presetStatus = level <= 0 ? "Removed " + enchSelectedId + "." : "Set " + enchSelectedId + " " + level + ".";
-		}
-		expandComponents();
-	}
-
-	// ---- attribute preset ----
-	/** Left-click an attribute row: load an existing modifier for editing, or add a new one. */
-	private void selectAttribute(String idStr) {
-		attrSelectedId = idStr;
-		Presets.currentAttribute(root, registries, idStr).ifPresentOrElse(state -> {
-			// Already on the item — load its amount / operation / slot for editing.
-			setBox(valueBox, Presets.formatAmount(state.amount()).replace("+", ""));
-			attrOpIndex = Math.max(0, Presets.OPERATIONS.indexOf(state.operation()));
-			attrSlotIndex = Math.max(0, Presets.SLOT_GROUPS.indexOf(state.slot()));
-			presetStatus = "Editing " + idStr + ".";
-		}, () -> {
-			double amount = parseDouble(valueBox.getValue());
-			if (Presets.setAttribute(root, registries, idStr, amount,
-					Presets.OPERATIONS.get(attrOpIndex), Presets.SLOT_GROUPS.get(attrSlotIndex))) {
-				presetStatus = "Set " + idStr + " " + Presets.formatAmount(amount) + ".";
-			}
-		});
-		expandComponents();
-		syncPanel();
-		setFocused(valueBox);
-	}
-
-	/** Apply the amount box to the selected attribute, re-using the current operation / slot. */
-	private void applyAttributeAmount() {
-		if (attrSelectedId == null) {
-			return;
-		}
-		double amount = parseDouble(valueBox.getValue());
-		if (Presets.setAttribute(root, registries, attrSelectedId, amount,
-				Presets.OPERATIONS.get(attrOpIndex), Presets.SLOT_GROUPS.get(attrSlotIndex))) {
-			presetStatus = "Set " + attrSelectedId + " " + Presets.formatAmount(amount) + ".";
-		}
-		expandComponents();
-	}
-
-	/** Right-click / Remove button: drop every modifier for the given attribute. */
-	private void removeAttribute(String idStr) {
-		if (Presets.removeAttribute(root, registries, idStr)) {
-			presetStatus = "Removed " + idStr + ".";
-			if (idStr.equals(attrSelectedId)) {
-				attrSelectedId = null;
-			}
-			expandComponents();
-			syncPanel();
-		}
-	}
-
-	private void cycleAttrOperation() {
-		attrOpIndex = (attrOpIndex + 1) % Presets.OPERATIONS.size();
-		updateToolLabels();
-		if (attrSelectedId != null) {
-			applyAttributeAmount();
-		}
-	}
-
-	private void cycleAttrSlot() {
-		attrSlotIndex = (attrSlotIndex + 1) % Presets.SLOT_GROUPS.size();
-		updateToolLabels();
-		if (attrSelectedId != null) {
-			applyAttributeAmount();
-		}
-	}
-
-	private List<Identifier> filteredAttributes() {
-		return filterIds(allAttributes);
-	}
-
-	private List<Identifier> filteredEnchants() {
-		return filterIds(allEnchants);
-	}
-
-	/** Substring-filter an id list by the current key box (used by both picker lists). */
-	private List<Identifier> filterIds(List<Identifier> all) {
-		String filter = keyBox.getValue().trim().toLowerCase(Locale.ROOT);
-		if (filter.isEmpty()) {
-			return all;
-		}
-		List<Identifier> out = new ArrayList<>();
-		for (Identifier id : all) {
-			if (id.toString().toLowerCase(Locale.ROOT).contains(filter)) {
-				out.add(id);
-			}
-		}
-		return out;
-	}
-
-	/** Expand root + its components compound so a preset's effect is visible in the tree. */
-	private void expandComponents() {
-		expanded.add(root);
-		if (root.get("components") instanceof CompoundTag components) {
-			expanded.add(components);
-		}
-	}
-
-	// ---- tree actions ----
-	private void addChild() {
-		if (preset == Preset.ATTRIBUTES) {
-			cycleAttrSlot();
-			return;
-		}
-		Tag target;
-		if (hasSelection() && selectedTag() instanceof CompoundTag) {
-			target = selectedTag();
-		} else if (hasSelection() && selectedTag() instanceof ListTag) {
-			target = selectedTag();
-		} else if (hasSelection()) {
-			target = selParent;
-		} else {
-			target = root;
-		}
-
-		Tag newTag = StringTag.valueOf("");
-		if (target instanceof CompoundTag c) {
-			String key = uniqueKey(c);
-			c.put(key, newTag);
-			expanded.add(c);
-			select(c, key, -1);
-		} else if (target instanceof ListTag l) {
-			l.add(l.size(), newTag);
-			expanded.add(l);
-			select(l, null, l.size() - 1);
-		}
-	}
-
-	private void deleteSelected() {
-		if (preset == Preset.ATTRIBUTES) {
-			if (attrSelectedId != null) {
-				removeAttribute(attrSelectedId);
-			}
-			return;
-		}
-		if (!hasSelection()) {
-			return;
-		}
-		if (selParent instanceof CompoundTag c && selKey != null) {
-			c.remove(selKey);
-		} else if (selParent instanceof ListTag l && selIndex >= 0) {
-			l.remove(selIndex);
-		}
-		clearSelection();
-	}
-
-	private void cycleType() {
-		if (preset == Preset.ATTRIBUTES) {
-			cycleAttrOperation();
-			return;
-		}
-		Tag t = selectedTag();
-		if (t == null) {
-			return;
-		}
-		int cur = t.getId();
-		int i = 0;
-		for (int j = 0; j < TYPE_CYCLE.length; j++) {
-			if (TYPE_CYCLE[j] == cur) {
-				i = j;
-				break;
-			}
-		}
-		int next = TYPE_CYCLE[(i + 1) % TYPE_CYCLE.length];
-		String text = (t instanceof NumericTag || t instanceof StringTag) ? leafText(t) : "";
-		replaceSelected(createTag(next, text));
-		syncPanel();
-	}
-
-	private void save() {
-		commitKeyRename();
-		ClientPlayNetworking.send(new EditItemPayload(playerInventory, syncId, slotIndex, root));
-		onClose();
-	}
-
-	// ---- tag helpers ----
 	private static String uniqueKey(CompoundTag c) {
-		if (!c.contains("new")) {
-			return "new";
+		if (!c.contains("new_tag")) {
+			return "new_tag";
 		}
 		for (int i = 1; ; i++) {
-			String k = "new" + i;
+			String k = "new_tag" + i;
 			if (!c.contains(k)) {
 				return k;
 			}
-		}
-	}
-
-	private static long parseLong(String s) {
-		try {
-			return Long.parseLong(s.trim());
-		} catch (NumberFormatException e) {
-			try {
-				return (long) Double.parseDouble(s.trim());
-			} catch (NumberFormatException e2) {
-				return 0L;
-			}
-		}
-	}
-
-	private static double parseDouble(String s) {
-		try {
-			return Double.parseDouble(s.trim());
-		} catch (NumberFormatException e) {
-			return 0.0;
 		}
 	}
 
@@ -716,409 +1154,75 @@ public class NbtEditorScreen extends Screen {
 		return "";
 	}
 
+	private static long parseLong(String s) {
+		try {
+			return Long.parseLong(s.trim());
+		} catch (Exception e) {
+			return 0L;
+		}
+	}
+
+	private static double parseDouble(String s) {
+		try {
+			return Double.parseDouble(s.trim());
+		} catch (Exception e) {
+			return 0.0;
+		}
+	}
+
 	private static String typeName(int id) {
 		return switch (id) {
-			case T_BYTE -> "byte";
-			case T_SHORT -> "short";
-			case T_INT -> "int";
-			case T_LONG -> "long";
-			case T_FLOAT -> "float";
-			case T_DOUBLE -> "double";
-			case 7 -> "byte[]";
-			case T_STRING -> "string";
-			case T_LIST -> "list";
-			case T_COMPOUND -> "compound";
-			case 11 -> "int[]";
-			case 12 -> "long[]";
-			default -> "?";
+			case T_BYTE -> "Byte";
+			case T_SHORT -> "Short";
+			case T_INT -> "Int";
+			case T_LONG -> "Long";
+			case T_FLOAT -> "Float";
+			case T_DOUBLE -> "Double";
+			case 7 -> "Byte Array";
+			case T_STRING -> "String";
+			case T_LIST -> "List";
+			case T_COMPOUND -> "Compound";
+			case 11 -> "Int Array";
+			case 12 -> "Long Array";
+			default -> "Unknown";
 		};
 	}
 
-	// ---- tree building ----
-	private void rebuildRows() {
-		rows.clear();
-		appendChildren(root, 0);
-	}
-
-	private void appendChildren(Tag tag, int depth) {
-		if (tag instanceof CompoundTag compound) {
-			List<String> keys = new ArrayList<>(compound.keySet());
-			Collections.sort(keys);
-			for (String key : keys) {
-				addRow(depth, compound.get(key), compound, key, -1);
-			}
-		} else if (tag instanceof ListTag list) {
-			for (int i = 0; i < list.size(); i++) {
-				addRow(depth, list.get(i), list, null, i);
-			}
-		}
-	}
-
-	private void addRow(int depth, Tag tag, Tag parent, String key, int index) {
-		boolean container = tag instanceof CompoundTag || tag instanceof ListTag;
-		rows.add(new Row(depth, tag, container, parent, key, index));
-		if (container && expanded.contains(tag)) {
-			appendChildren(tag, depth + 1);
-		}
-	}
-
-	private boolean isSelectedRow(Row row) {
-		if (row.parent() != selParent) {
-			return false;
-		}
-		return selKey != null ? selKey.equals(row.key()) : row.index() == selIndex;
-	}
-
-	private String describe(Row row) {
-		String label = row.key() != null ? row.key() : "[" + row.index() + "]";
-		Tag t = row.tag();
-		if (row.container()) {
-			int size = (t instanceof CompoundTag c) ? c.size() : ((ListTag) t).size();
-			String bracket = (t instanceof CompoundTag) ? "{" + size + "}" : "[" + size + "]";
-			String arrow = expanded.contains(t) ? "▾ " : "▸ ";
-			return arrow + label + ": " + bracket;
-		}
-		String value = leafText(t);
-		if (!(t instanceof StringTag) && !(t instanceof NumericTag)) {
-			value = t.toString();
-		}
-		if (value.length() > 70) {
-			value = value.substring(0, 67) + "...";
-		}
-		return "  " + label + " (" + typeName(t.getId()) + "): " + value;
-	}
-
-	// ---- rendering ----
-	@Override
-	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-		super.extractRenderState(g, mouseX, mouseY, partialTick);
-
-		g.centeredText(this.font, this.title, this.width / 2, 12, 0xFFFFFFFF);
-		g.centeredText(this.font, "edits apply live — press Save   ·   slot " + slotIndex,
-				this.width / 2, 24, 0xFFAAAAAA);
-
-		drawActiveTabIndicator(g);
-
-		if (preset == Preset.ENCHANT) {
-			renderEnchantList(g);
-		} else if (preset == Preset.ATTRIBUTES) {
-			renderAttributeList(g);
-		} else if (preset == Preset.RENAME) {
-			renderRenamePalette(g);
-		} else {
-			renderTree(g);
-		}
-
-		String crumb = breadcrumb();
-		g.text(this.font, crumb, MARGIN, breadcrumbY(), 0xFFFFFFAA);
-	}
-
-	private void drawActiveTabIndicator(GuiGraphicsExtractor g) {
-		Button active = switch (preset) {
-			case RENAME -> renameBtn;
-			case COUNT -> countBtn;
-			case ENCHANT -> enchantBtn;
-			case ATTRIBUTES -> attributesBtn;
-			default -> null;
-		};
-		if (active != null) {
-			g.fill(active.getX() - 4, active.getY(), active.getX() - 1, active.getY() + active.getHeight(), 0xFF40FF40);
-		}
-		if (Presets.hasComponent(root, DataComponents.UNBREAKABLE)) {
-			g.fill(unbreakBtn.getX() - 4, unbreakBtn.getY(), unbreakBtn.getX() - 1,
-					unbreakBtn.getY() + unbreakBtn.getHeight(), 0xFFFFC040);
-		}
-	}
-
-	private void renderTree(GuiGraphicsExtractor g) {
-		rebuildRows();
-		int left = MARGIN;
-		int top = LIST_TOP;
-		int bottom = treeBottom();
-		int right = centralRight();
-
-		g.fill(left - 4, top - 4, right + 4, bottom + 4, 0x66000000);
-		g.enableScissor(left - 4, top, right + 4, bottom);
-		int y = top - scroll;
-		for (Row row : rows) {
-			if (y + ROW_HEIGHT >= top && y <= bottom) {
-				if (isSelectedRow(row)) {
-					g.fill(left - 4, y - 1, right + 4, y + ROW_HEIGHT - 1, 0x804080FF);
-				}
-				int x = left + row.depth() * INDENT;
-				int color = row.container() ? 0xFF7FD6FF : 0xFFE0E0E0;
-				g.text(this.font, describe(row), x, y, color);
-			}
-			y += ROW_HEIGHT;
-		}
-		g.disableScissor();
-	}
-
-	private void renderEnchantList(GuiGraphicsExtractor g) {
-		int left = MARGIN;
-		int top = LIST_TOP;
-		int bottom = treeBottom();
-		int right = centralRight();
-		List<Identifier> filtered = filteredEnchants();
-		Map<String, Integer> levels = Presets.currentEnchantments(root, registries);
-
-		g.fill(left - 4, top - 4, right + 4, bottom + 4, 0x66000000);
-		g.enableScissor(left - 4, top, right + 4, bottom);
-		int y = top - scroll;
-		for (Identifier id : filtered) {
-			if (y + ROW_HEIGHT >= top && y <= bottom) {
-				String idStr = id.toString();
-				boolean sel = idStr.equals(enchSelectedId);
-				if (sel) {
-					g.fill(left - 4, y - 1, right + 4, y + ROW_HEIGHT - 1, 0x804080FF);
-				}
-				Integer lvl = levels.get(idStr);
-				String label = idStr + (lvl != null ? "   (" + lvl + ")" : "");
-				int color = lvl != null ? 0xFF7FFF9F : 0xFFE0E0E0;
-				g.text(this.font, label, left, y, color);
-			}
-			y += ROW_HEIGHT;
-		}
-		g.disableScissor();
-	}
-
-	private void renderAttributeList(GuiGraphicsExtractor g) {
-		int left = MARGIN;
-		int top = LIST_TOP;
-		int bottom = treeBottom();
-		int right = centralRight();
-		List<Identifier> filtered = filteredAttributes();
-		Map<String, String> current = Presets.currentAttributes(root, registries);
-
-		g.fill(left - 4, top - 4, right + 4, bottom + 4, 0x66000000);
-		g.enableScissor(left - 4, top, right + 4, bottom);
-		int y = top - scroll;
-		for (Identifier id : filtered) {
-			if (y + ROW_HEIGHT >= top && y <= bottom) {
-				String idStr = id.toString();
-				boolean sel = idStr.equals(attrSelectedId);
-				if (sel) {
-					g.fill(left - 4, y - 1, right + 4, y + ROW_HEIGHT - 1, 0x804080FF);
-				}
-				String summary = current.get(idStr);
-				String label = idStr + (summary != null ? "   " + summary : "");
-				int color = summary != null ? 0xFF7FFF9F : 0xFFE0E0E0;
-				g.text(this.font, label, left, y, color);
-			}
-			y += ROW_HEIGHT;
-		}
-		g.disableScissor();
-	}
-
-	private void renderRenamePalette(GuiGraphicsExtractor g) {
-		int left = MARGIN;
-		int top = LIST_TOP;
-		int right = centralRight();
-		int bottom = treeBottom();
-		g.fill(left - 4, top - 4, right + 4, bottom + 4, 0x66000000);
-
-		// Format toggles: B / I / U / S / K, highlighted green when active.
-		g.text(this.font, "Format", left, top, 0xFFAAAAAA);
-		boolean[] states = {fmtBold, fmtItalic, fmtUnderline, fmtStrike, fmtObfuscated};
-		int fy = fmtRowY();
-		for (int i = 0; i < FMT_LETTERS.length; i++) {
-			int x = left + i * (FMT_SIZE + FMT_GAP);
-			g.fill(x, fy, x + FMT_SIZE, fy + FMT_SIZE, states[i] ? 0xFF2E7D32 : 0xFF3A3A3A);
-			g.centeredText(this.font, styledLetter(i), x + FMT_SIZE / 2, fy + (FMT_SIZE - 8) / 2, 0xFFFFFFFF);
-		}
-
-		// Colour swatches: a "default" (×) cell first, then the vanilla palette.
-		int gridTop = paletteTop();
-		g.text(this.font, "Colour", left, gridTop - 10, 0xFFAAAAAA);
-		int cols = paletteCols();
-		int count = 1 + NAME_COLORS.length;
-		for (int idx = 0; idx < count; idx++) {
-			int cx = left + (idx % cols) * (SWATCH + SWATCH_GAP);
-			int cy = gridTop + (idx / cols) * (SWATCH + SWATCH_GAP);
-			boolean selected;
-			if (idx == 0) {
-				g.fill(cx, cy, cx + SWATCH, cy + SWATCH, 0xFF202020);
-				g.centeredText(this.font, "×", cx + SWATCH / 2, cy + (SWATCH - 8) / 2, 0xFFCCCCCC);
-				selected = nameColor == null;
-			} else {
-				ChatFormatting cf = NAME_COLORS[idx - 1];
-				Integer rgb = cf.getColor();
-				g.fill(cx, cy, cx + SWATCH, cy + SWATCH, 0xFF000000 | (rgb == null ? 0 : rgb));
-				selected = cf == nameColor;
-			}
-			if (selected) {
-				drawSwatchBorder(g, cx, cy);
-			}
-		}
-	}
-
-	/** A 1px white border around a selected swatch. */
-	private void drawSwatchBorder(GuiGraphicsExtractor g, int x, int y) {
-		int c = 0xFFFFFFFF;
-		g.fill(x - 1, y - 1, x + SWATCH + 1, y, c);
-		g.fill(x - 1, y + SWATCH, x + SWATCH + 1, y + SWATCH + 1, c);
-		g.fill(x - 1, y, x, y + SWATCH, c);
-		g.fill(x + SWATCH, y, x + SWATCH + 1, y + SWATCH, c);
-	}
-
-	/** The toggle letter, drawn in its own format so it previews the effect. */
-	private Component styledLetter(int i) {
-		MutableComponent c = Component.literal(FMT_LETTERS[i]);
-		return switch (i) {
-			case 0 -> c.withStyle(ChatFormatting.BOLD);
-			case 1 -> c.withStyle(ChatFormatting.ITALIC);
-			case 2 -> c.withStyle(ChatFormatting.UNDERLINE);
-			case 3 -> c.withStyle(ChatFormatting.STRIKETHROUGH);
-			default -> c;
+	private static String typeBadgeName(int id) {
+		return switch (id) {
+			case T_BYTE -> "BYT";
+			case T_SHORT -> "SHT";
+			case T_INT -> "INT";
+			case T_LONG -> "LNG";
+			case T_FLOAT -> "FLT";
+			case T_DOUBLE -> "DBL";
+			case 7 -> "B[]";
+			case T_STRING -> "STR";
+			case T_LIST -> "LST";
+			case T_COMPOUND -> "COM";
+			case 11 -> "I[]";
+			case 12 -> "L[]";
+			default -> "???";
 		};
 	}
 
-	private String breadcrumb() {
-		if (preset != Preset.NONE) {
-			String prompt = switch (preset) {
-				case RENAME -> "Rename: type the name below; click B/I/U/S/K to toggle formats and a swatch to set colour (× = default; empty clears).";
-				case COUNT -> "Set count: number ≥ 1 in the value box (e.g. 1 / 16 / 64).";
-				case ENCHANT -> "Enchant: left-click adds/edits, right-click removes; filter in key box, level in value box.";
-				case ATTRIBUTES -> "Attribute: left-click adds/edits, right-click removes; amount in value box; Slot/Op buttons set slot & operation.";
-				default -> "";
-			};
-			return presetStatus.isEmpty() ? prompt : prompt + "   —   " + presetStatus;
-		}
-		Tag selTag = selectedTag();
-		return selTag == null
-				? "No selection — click a node. Add creates into the selected container (or root)."
-				: "Selected: " + (selKey != null ? selKey : "[" + selIndex + "]") + "  (" + typeName(selTag.getId()) + ")";
-	}
-
-	// ---- input ----
-	@Override
-	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		if (super.mouseClicked(event, doubleClick)) {
-			return true;
-		}
-		boolean inCentral = event.x() >= MARGIN - 4 && event.x() <= centralRight() + 4
-				&& event.y() >= LIST_TOP && event.y() <= treeBottom();
-		if (!inCentral) {
-			return false;
-		}
-		int idx = (int) ((event.y() - (LIST_TOP - scroll)) / ROW_HEIGHT);
-
-		if (preset == Preset.ENCHANT) {
-			List<Identifier> filtered = filteredEnchants();
-			if (idx >= 0 && idx < filtered.size()) {
-				String idStr = filtered.get(idx).toString();
-				if (event.button() == 1) {
-					removeEnchant(idStr);      // right-click disables an active enchantment
-				} else if (event.button() == 0) {
-					selectEnchant(idStr);       // left-click adds / edits
-				}
-				return true;
-			}
-			return false;
-		}
-
-		if (preset == Preset.ATTRIBUTES) {
-			List<Identifier> filtered = filteredAttributes();
-			if (idx >= 0 && idx < filtered.size()) {
-				String idStr = filtered.get(idx).toString();
-				if (event.button() == 1) {
-					removeAttribute(idStr);    // right-click removes the attribute's modifiers
-				} else if (event.button() == 0) {
-					selectAttribute(idStr);     // left-click adds / edits
-				}
-				return true;
-			}
-			return false;
-		}
-
-		if (preset == Preset.RENAME) {
-			return event.button() == 0 && handleRenamePaletteClick((int) event.x(), (int) event.y());
-		}
-
-		if (event.button() == 0 && idx >= 0 && idx < rows.size()) {
-			Row row = rows.get(idx);
-			if (doubleClick && row.container()) {
-				if (expanded.contains(row.tag())) {
-					expanded.remove(row.tag());
-				} else {
-					expanded.add(row.tag());
-				}
-			} else {
-				select(row.parent(), row.key(), row.index());
-			}
-			return true;
-		}
-		return false;
-	}
-
-	private void selectEnchant(String idStr) {
-		enchSelectedId = idStr;
-		int existing = Presets.currentEnchantments(root, registries).getOrDefault(idStr, 0);
-		if (existing > 0) {
-			// Already on the item — load its level for editing instead of overwriting it.
-			setBox(valueBox, Integer.toString(existing));
-			presetStatus = "Editing " + idStr + " (" + existing + ").";
-		} else {
-			int level = (int) parseLong(valueBox.getValue());
-			if (level <= 0) {
-				level = 1;
-				setBox(valueBox, "1");
-			}
-			if (Presets.setEnchantment(root, registries, idStr, level)) {
-				presetStatus = "Set " + idStr + " " + level + ".";
-			}
-		}
-		expandComponents();
-		setFocused(valueBox);
-	}
-
-	/** Right-click handler: disable an enchantment that's currently on the item (no-op otherwise). */
-	private void removeEnchant(String idStr) {
-		if (!Presets.currentEnchantments(root, registries).containsKey(idStr)) {
-			return;
-		}
-		Presets.setEnchantment(root, registries, idStr, 0);
-		presetStatus = "Removed " + idStr + ".";
-		if (idStr.equals(enchSelectedId)) {
-			enchSelectedId = null;
-		}
-		expandComponents();
-	}
-
-	@Override
-	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-		int contentRows = switch (preset) {
-			case ENCHANT -> filteredEnchants().size();
-			case ATTRIBUTES -> filteredAttributes().size();
-			default -> rows.size();
+	private static int typeBadgeColor(int id) {
+		return switch (id) {
+			case T_BYTE -> 0xFFBA68C8;     // Purple
+			case T_SHORT -> 0xFFA1887F;    // Brown
+			case T_INT -> 0xFF81C784;      // Green
+			case T_LONG -> 0xFFE57373;     // Red
+			case T_FLOAT -> 0xFFFFD54F;    // Yellow
+			case T_DOUBLE -> 0xFFFFB74D;   // Amber
+			case T_STRING -> 0xFF4FC3F7;   // Light Blue
+			case T_LIST -> COLOR_ORANGE_DARK;
+			case T_COMPOUND -> COLOR_ORANGE_PRIMARY;
+			default -> 0xFFAAAAAA;
 		};
-		int contentHeight = contentRows * ROW_HEIGHT;
-		int viewHeight = treeBottom() - LIST_TOP;
-		int maxScroll = Math.max(0, contentHeight - viewHeight);
-		scroll = Math.max(0, Math.min(maxScroll, scroll - (int) (scrollY * ROW_HEIGHT * 2)));
-		return true;
 	}
 
 	@Override
 	public boolean isPauseScreen() {
 		return false;
-	}
-
-	private record Row(int depth, Tag tag, boolean container, Tag parent, String key, int index) {}
-
-	/** Key box that commits a pending rename when it loses focus (e.g. clicking a toolbar button). */
-	private class CommitEditBox extends EditBox {
-		CommitEditBox(int x, int y, int w, int h) {
-			super(NbtEditorScreen.this.font, x, y, w, h, Component.literal("key"));
-		}
-
-		@Override
-		public void setFocused(boolean focused) {
-			boolean wasFocused = isFocused();
-			super.setFocused(focused);
-			if (wasFocused && !focused) {
-				commitKeyRename();
-			}
-		}
 	}
 }
